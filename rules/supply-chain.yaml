@@ -1,0 +1,61 @@
+# OpenGuard Rules — Supply Chain
+# These rules detect supply chain risks in dependency management and package scripts.
+
+rules:
+  - id: OG-SC-001
+    title: "Dependency from unknown source"
+    description: "Detects dependencies installed directly from GitHub URLs or other non-registry sources. These are harder to audit and may lack the moderation of public registries."
+    severity: medium
+    confidence: medium
+    category: supply-chain
+    scope:
+      file_types: [shell, markdown, json-config, yaml-config]
+    patterns:
+      - regex: 'npm\s+install\s+[^\s]*github\.com/'
+        description: "npm install from GitHub URL"
+      - regex: 'npm\s+install\s+[^\s]*https?://'
+        description: "npm install from HTTP URL"
+      - regex: 'pip\s+install\s+git\+'
+        description: "pip install from git repository"
+      - regex: 'pip\s+install\s+https?://'
+        description: "pip install from URL"
+      - regex: 'go\s+get\s+[^\s]+\.\w+/'
+        description: "go get from arbitrary domain"
+    remediation: "Prefer registry packages. If using git, pin to specific commit SHA."
+    tags: [supply-chain, dependencies, registry]
+
+  - id: OG-SC-002
+    title: "Post-install script with network access"
+    description: "Detects package post-install scripts that make network requests. These scripts run automatically during npm install and can execute arbitrary code."
+    severity: high
+    confidence: medium
+    category: supply-chain
+    scope:
+      file_types: [json-config, shell]
+    patterns:
+      - regex: '"(preinstall|postinstall|prepare)"\s*:\s*"[^"]*curl\b'
+        description: "Package script with curl"
+      - regex: '"(preinstall|postinstall|prepare)"\s*:\s*"[^"]*wget\b'
+        description: "Package script with wget"
+      - regex: '"(preinstall|postinstall|prepare)"\s*:\s*"[^"]*node\s+-e\b'
+        description: "Package script with inline node execution"
+      - regex: '"(preinstall|postinstall|prepare)"\s*:\s*"[^"]*fetch\('
+        description: "Package script with fetch"
+    remediation: "Use --ignore-scripts flag. Inspect postinstall scripts before running npm install."
+    tags: [supply-chain, npm, postinstall]
+
+  - id: OG-SC-003
+    title: "Lockfile manipulation indicators"
+    description: "Detects potential lockfile manipulation, such as registry URL changes or integrity hash mismatches. May indicate dependency substitution attacks."
+    severity: medium
+    confidence: low
+    category: supply-chain
+    scope:
+      file_types: [json-config, yaml-config]
+    patterns:
+      - regex: '"resolved":\s*"https?://(?!registry\.npmjs\.org|registry\.yarnpkg\.com)'
+        description: "Non-standard registry URL in lockfile"
+      - regex: '"registry":\s*"https?://(?!registry\.npmjs\.org)'
+        description: "Custom registry in package config"
+    remediation: "Review lockfile changes. Ensure registry URLs match expected registries."
+    tags: [supply-chain, lockfile, dependency-confusion]

@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Coverage
+coverage/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Temp
+tmp/
+*.tmp
+
+# Local data
+.openguard/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Local docs
+guide.md
+
+# Docs
+docs/
+
+# Test artifacts
+tests/snapshots/__new__/

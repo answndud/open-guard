@@ -1,0 +1,83 @@
+# OpenGuard Rules — macOS Specific
+# These rules detect macOS-specific risky patterns.
+
+rules:
+  - id: OG-MAC-001
+    title: "osascript automation"
+    description: "Detects AppleScript execution via osascript. Can be used for UI automation, keychain access prompts, screen capture, and other privileged operations."
+    severity: high
+    confidence: medium
+    category: macos
+    scope:
+      file_types: [shell, markdown]
+    patterns:
+      - regex: '\bosascript\b'
+        description: "osascript command"
+      - regex: '\bosascript\s+-e\s+'
+        description: "osascript with inline script"
+      - regex: '\bosascript\s+[^\s]+\.scpt'
+        description: "osascript running script file"
+    remediation: "Document what the AppleScript does. Use native APIs instead of osascript where possible."
+    tags: [macos, automation, ui-access]
+
+  - id: OG-MAC-002
+    title: "LaunchAgent persistence"
+    description: "Detects creation or loading of LaunchAgents, which establish persistent execution on every macOS login."
+    severity: critical
+    confidence: high
+    category: macos
+    scope:
+      file_types: [shell, markdown, python]
+    patterns:
+      - regex: '~/Library/LaunchAgents/'
+        description: "Reference to user LaunchAgents directory"
+      - regex: '/Library/LaunchAgents/'
+        description: "Reference to system LaunchAgents directory"
+      - regex: '/Library/LaunchDaemons/'
+        description: "Reference to LaunchDaemons directory"
+      - regex: 'launchctl\s+(load|bootstrap)'
+        description: "launchctl load/bootstrap command"
+      - regex: 'launchctl\s+submit'
+        description: "launchctl submit command"
+    remediation: "Clearly document the LaunchAgent purpose. Provide uninstall instructions. Consider alternatives."
+    tags: [macos, persistence, launchagent]
+
+  - id: OG-MAC-003
+    title: "Keychain access"
+    description: "Detects direct access to macOS Keychain, which stores passwords, certificates, and encryption keys."
+    severity: critical
+    confidence: high
+    category: credentials
+    scope:
+      file_types: [shell, python]
+    patterns:
+      - regex: 'security\s+find-generic-password'
+        description: "Keychain: find generic password"
+      - regex: 'security\s+find-internet-password'
+        description: "Keychain: find internet password"
+      - regex: 'security\s+dump-keychain'
+        description: "Keychain: dump all entries"
+      - regex: 'security\s+export'
+        description: "Keychain: export certificates/keys"
+    remediation: "Never access Keychain programmatically without explicit user consent. Use proper credential management."
+    tags: [macos, credentials, keychain, critical]
+
+  - id: OG-MAC-004
+    title: "TCC / Privacy bypass attempts"
+    description: "Detects attempts to bypass macOS Transparency, Consent, and Control (TCC) privacy protections."
+    severity: high
+    confidence: medium
+    category: macos
+    scope:
+      file_types: [shell, python]
+    patterns:
+      - regex: '\btccutil\b'
+        description: "tccutil command (reset TCC database)"
+      - regex: 'TCC\.db'
+        description: "Direct TCC database access"
+      - regex: 'com\.apple\.TCC'
+        description: "TCC service identifier"
+      - regex: 'kTCCServiceAccessibility'
+        description: "Accessibility API access"
+    remediation: "Request only necessary permissions through proper macOS channels."
+    tags: [macos, privacy, tcc]

@@ -1,0 +1,41 @@
+# Sample risky GitHub Actions workflow — TEST FIXTURE for OpenGuard
+# This intentionally contains risky patterns for testing.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# OG-GHA-001: overly broad permissions
+permissions: write-all
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # OG-GHA-002: unpinned action (uses branch, not SHA)
+      - uses: actions/checkout@main
+
+      - name: Setup Node
+        uses: actions/setup-node@main
+        with:
+          node-version: '20'
+
+      - name: Install
+        run: npm install
+
+      # OG-GHA-004: script injection via unsanitized expression
+      - name: Echo PR title
+        run: echo "PR Title: ${{ github.event.pull_request.title }}"
+
+      - name: Run tests
+        run: npm test
+
+      # Risky: downloading and executing remote script in CI
+      - name: Deploy
+        run: |
+          curl -sSL https://deploy.example.com/deploy.sh | bash
+        env:
+          DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}

@@ -1,0 +1,195 @@
+# OpenGuard Rules — Shell / Installer
+# These rules detect risky patterns in shell scripts and install instructions.
+
+rules:
+  - id: OG-SHELL-001
+    title: "Remote code execution via curl pipe"
+    description: "Detects curl/wget output piped to shell execution. This allows the remote server to execute arbitrary code on the user's machine without inspection."
+    severity: critical
+    confidence: high
+    category: shell
+    scope:
+      file_types: [shell, markdown, yaml-workflow, dockerfile]
+    patterns:
+      - regex: 'curl\s+[^|]*\|\s*(ba)?sh'
+        description: "curl output piped to bash/sh"
+      - regex: 'wget\s+[^|]*\|\s*(ba)?sh'
+        description: "wget output piped to bash/sh"
+      - regex: 'curl\s+[^|]*\|\s*sudo\s+(ba)?sh'
+        description: "curl piped to sudo bash"
+      - regex: 'wget\s+[^|]*\|\s*sudo\s+(ba)?sh'
+        description: "wget piped to sudo bash"
+    remediation: "Download the script first, inspect it, verify its checksum, then run from local file"
+    tags: [supply-chain, rce, install]
+
+  - id: OG-SHELL-002
+    title: "Overly permissive file permissions"
+    description: "Detects chmod 777 or equivalent that makes files world-readable, writable, and executable. This can enable privilege abuse and persistence."
+    severity: high
+    confidence: medium
+    category: filesystem
+    scope:
+      file_types: [shell, markdown, dockerfile]
+    patterns:
+      - regex: 'chmod\s+(-R\s+)?777\b'
+        description: "chmod 777 (world rwx)"
+      - regex: 'chmod\s+(-R\s+)?a\+rwx\b'
+        description: "chmod a+rwx (world rwx)"
+      - regex: 'chmod\s+(-R\s+)?666\b'
+        description: "chmod 666 (world rw)"
+    remediation: "Use minimum required permissions (e.g., chmod 755 for executables, chmod 644 for data files)"
+    tags: [permissions, filesystem]
+
+  - id: OG-SHELL-003
+    title: "Base64 decode and execute"
+    description: "Detects base64-encoded content being decoded and piped to shell execution. This is a common obfuscation technique for hiding malicious payloads."
+    severity: critical
+    confidence: high
+    category: obfuscation
+    scope:
+      file_types: [shell, markdown, yaml-workflow]
+    patterns:
+      - regex: 'base64\s+(-d|-D|--decode)\s*\|\s*(ba)?sh'
+        description: "base64 decode piped to shell"
+      - regex: 'echo\s+[^\|]+\|\s*base64\s+(-d|-D|--decode)\s*\|\s*(ba)?sh'
+        description: "echo base64 string decoded and executed"
+      - regex: 'base64\s+(-d|-D|--decode)[^|]*\|\s*eval'
+        description: "base64 decode piped to eval"
+    remediation: "Decode the content first, inspect it, then execute if safe"
+    tags: [obfuscation, payload]
+
+  - id: OG-SHELL-004
+    title: "Hidden eval / dynamic command execution"
+    description: "Detects eval with dynamic input or command substitution from network sources. Attacker-controlled input may lead to arbitrary code execution."
+    severity: high
+    confidence: medium
+    category: shell
+    scope:
+      file_types: [shell, markdown]
+    patterns:
+      - regex: 'eval\s+\$\('
+        description: "eval with command substitution"
+      - regex: 'bash\s+-c\s+"\$\(curl'
+        description: "bash -c with curl substitution"
+      - regex: 'sh\s+-c\s+"\$\(wget'
+        description: "sh -c with wget substitution"
+      - regex: 'eval\s+"?\$\{?[A-Z_]+\}?"?\s*$'
+        description: "eval with environment variable"
+    remediation: "Avoid eval with external or dynamic input. Use explicit commands instead."
+    tags: [eval, dynamic-exec]
+
+  - id: OG-SHELL-005
+    title: "Shell RC modification (persistence)"
+    description: "Detects writes to shell configuration files (.bashrc, .zshrc, .profile). This establishes persistence as the injected commands run on every new shell."
+    severity: high
+    confidence: medium
+    category: filesystem
+    scope:
+      file_types: [shell, markdown]
+    patterns:
+      - regex: '>>\s*~/?\.(bashrc|bash_profile|zshrc|zprofile|profile|zshenv)'
+        description: "Append to shell rc file"
+      - regex: 'echo\s+.*>>\s*~/?\.(bashrc|bash_profile|zshrc|zprofile|profile)'
+        description: "Echo content to shell rc file"
+      - regex: 'tee\s+(-a\s+)?~/?\.(bashrc|bash_profile|zshrc|zprofile|profile)'
+        description: "Tee to shell rc file"
+    remediation: "Document the modification clearly and require explicit user consent. Provide uninstall instructions."
+    tags: [persistence, shell-config]
+
+  - id: OG-SHELL-006
+    title: "Sudo / privilege escalation"
+    description: "Detects use of sudo or other privilege escalation commands. Skills should not require root unless absolutely justified."
+    severity: high
+    confidence: high
+    category: shell
+    scope:
+      file_types: [shell, markdown, yaml-workflow]
+    patterns:
+      - regex: '\bsudo\s+'
+        description: "sudo command"
+      - regex: '\bdoas\s+'
+        description: "doas command (OpenBSD sudo alternative)"
+      - regex: '\bsu\s+-c\s+'
+        description: "su with command"
+      - regex: '\bpkexec\s+'
+        description: "pkexec (PolicyKit)"
+    remediation: "Explain why elevated privileges are needed. Provide non-root alternatives where possible."
+    tags: [privilege-escalation, sudo]
+
+  - id: OG-SHELL-007
+    title: "Process / environment dump"
+    description: "Detects commands that dump the full process environment, which may contain API keys, tokens, and other secrets."
+    severity: medium
+    confidence: medium
+    category: credentials
+    scope:
+      file_types: [shell, yaml-workflow]
+    patterns:
+      - regex: '\b(printenv|env)\s*$'
+        description: "Full environment dump"
+      - regex: '\bset\s*$'
+        description: "Shell set (shows all variables)"
+      - regex: 'cat\s+/proc/[^/]+/environ'
+        description: "Reading process environment from /proc"
+    remediation: "Access only specific, named environment variables instead of dumping all"
+    tags: [credentials, environment]
+
+  - id: OG-SHELL-008
+    title: "Destructive commands"
+    description: "Detects commands that can destroy data or render the system unusable."
+    severity: critical
+    confidence: high
+    category: filesystem
+    scope:
+      file_types: [shell, markdown]
+    patterns:
+      - regex: 'rm\s+(-[rf]+\s+)*/'
+        description: "rm -rf from root"
+      - regex: 'rm\s+(-[rf]+\s+)*~'
+        description: "rm -rf home directory"
+      - regex: '\bmkfs\b'
+        description: "Filesystem format"
+      - regex: 'dd\s+if=/dev/(zero|urandom)\s+of=/'
+        description: "dd write to disk device"
+      - regex: ':\(\)\{\s*:\|:\s*&\s*\}\s*;'
+        description: "Fork bomb"
+    remediation: "Never include destructive commands in skills. Add explicit safeguards if deletion is necessary."
+    tags: [destructive, data-loss]
+
+  - id: OG-SHELL-009
+    title: "Background execution / process detachment"
+    description: "Detects commands that run processes in the background or detach them. May indicate persistence mechanisms."
+    severity: medium
+    confidence: low
+    category: shell
+    scope:
+      file_types: [shell]
+    patterns:
+      - regex: '\bnohup\s+'
+        description: "nohup (survive terminal close)"
+      - regex: '\bdisown\b'
+        description: "disown (detach from shell)"
+      - regex: 'screen\s+-dm'
+        description: "screen detached session"
+      - regex: 'tmux\s+new-session\s+-d'
+        description: "tmux detached session"
+    remediation: "Document why background execution is needed. Ensure processes are properly managed."
+    tags: [persistence, background]
+
+  - id: OG-SHELL-010
+    title: "Archive extraction without inspection"
+    description: "Detects downloading and extracting archives in a single step without verification. May be vulnerable to zip-slip or path traversal attacks."
+    severity: medium
+    confidence: medium
+    category: supply-chain
+    scope:
+      file_types: [shell, markdown, yaml-workflow]
+    patterns:
+      - regex: 'curl\s+[^|]*\|\s*tar\s+'
+        description: "curl piped to tar extraction"
+      - regex: 'wget\s+[^|]*\|\s*tar\s+'
+        description: "wget piped to tar extraction"
+      - regex: 'curl\s+.*-o\s+\S+\.tar.*&&\s*tar\s+'
+        description: "Download then immediately extract"
+    remediation: "Download the archive, verify its checksum/signature, inspect contents, then extract to a specific directory"
+    tags: [supply-chain, archive]

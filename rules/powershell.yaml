@@ -1,0 +1,81 @@
+# OpenGuard Rules — PowerShell
+# These rules detect risky patterns in PowerShell scripts.
+
+rules:
+  - id: OG-PS-001
+    title: "Encoded command / obfuscation"
+    description: "Detects PowerShell encoded commands and Base64 string decoding. These techniques are commonly used to hide malicious payloads."
+    severity: critical
+    confidence: high
+    category: obfuscation
+    scope:
+      file_types: [powershell, markdown, yaml-workflow]
+    patterns:
+      - regex: '-[Ee]ncoded[Cc]ommand\b'
+        description: "-EncodedCommand parameter"
+      - regex: '-[Ee]nc\s+'
+        description: "-enc parameter (short form)"
+      - regex: '\[Convert\]::FromBase64String'
+        description: "Base64 string decoding"
+      - regex: '\[System\.Convert\]::FromBase64String'
+        description: "Full namespace Base64 decoding"
+    remediation: "Decode and inspect the payload before execution"
+    tags: [obfuscation, payload, powershell]
+
+  - id: OG-PS-002
+    title: "Invoke-Expression / IEX"
+    description: "Detects Invoke-Expression (IEX) which executes arbitrary strings as code. Often combined with network downloads for remote code execution."
+    severity: high
+    confidence: high
+    category: shell
+    scope:
+      file_types: [powershell, markdown]
+    patterns:
+      - regex: '\bInvoke-Expression\b'
+        description: "Invoke-Expression cmdlet"
+      - regex: '\bIEX\s*[\(\{]'
+        description: "IEX alias"
+      - regex: '\biex\s*[\(\{]'
+        description: "iex alias (lowercase)"
+      - regex: '\bInvoke-Command\b.*-ScriptBlock'
+        description: "Invoke-Command with ScriptBlock"
+    remediation: "Avoid IEX with network-sourced content. Execute scripts from verified local files."
+    tags: [exec, dynamic, powershell]
+
+  - id: OG-PS-003
+    title: "Download and execute pattern"
+    description: "Detects the PowerShell equivalent of 'curl | bash' — downloading content from the internet and immediately executing it."
+    severity: critical
+    confidence: high
+    category: shell
+    scope:
+      file_types: [powershell, markdown]
+    patterns:
+      - regex: 'Net\.WebClient\)\.DownloadString\([^\)]+\)\s*\|\s*IEX'
+        description: "WebClient.DownloadString piped to IEX"
+      - regex: 'Invoke-WebRequest\s+[^\|]+\|\s*(IEX|Invoke-Expression)'
+        description: "Invoke-WebRequest piped to IEX"
+      - regex: 'Invoke-RestMethod\s+[^\|]+\|\s*(IEX|Invoke-Expression)'
+        description: "Invoke-RestMethod piped to IEX"
+      - regex: 'iwr\s+[^\|]+\|\s*iex'
+        description: "iwr piped to iex (aliases)"
+    remediation: "Download the script to a file, inspect it, then execute locally"
+    tags: [rce, download-execute, powershell]
+
+  - id: OG-PS-004
+    title: "Execution policy bypass"
+    description: "Detects attempts to bypass PowerShell execution policy, which is a security control to prevent unauthorized script execution."
+    severity: high
+    confidence: high
+    category: shell
+    scope:
+      file_types: [powershell, markdown, yaml-workflow]
+    patterns:
+      - regex: 'Set-ExecutionPolicy\s+(Bypass|Unrestricted)'
+        description: "Set execution policy to Bypass/Unrestricted"
+      - regex: '-[Ee]xecutionPolicy\s+(Bypass|Unrestricted)'
+        description: "Execution policy flag"
+      - regex: '-[Ee]p\s+(Bypass|Unrestricted)'
+        description: "Execution policy flag (short form)"
+    remediation: "Use the minimum required execution policy. Prefer RemoteSigned over Bypass."
+    tags: [security-bypass, powershell]

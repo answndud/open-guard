@@ -1,0 +1,118 @@
+# OpenGuard Rules — Meta Configuration
+# Shared definitions for severity, confidence, and scoring used across all rule files.
+
+# Version of the rule format
+rule_format_version: "1.0"
+
+# Severity levels and their base scoring points
+severity_levels:
+  critical:
+    points: 30
+    description: "Strongly indicative of compromise, exfiltration, or persistent backdoor"
+    color: "#FF0000"
+  high:
+    points: 15
+    description: "Likely dangerous; requires careful review before proceeding"
+    color: "#FF8C00"
+  medium:
+    points: 8
+    description: "Potentially risky; context-dependent, may be legitimate"
+    color: "#FFD700"
+  low:
+    points: 3
+    description: "Questionable but common; usually legitimate"
+    color: "#90EE90"
+  info:
+    points: 1
+    description: "Informational; no immediate risk but worth noting"
+    color: "#87CEEB"
+
+# Confidence levels and their scoring multipliers
+confidence_levels:
+  high:
+    weight: 1.0
+    description: "Strong signal; very low false positive rate"
+  medium:
+    weight: 0.7
+    description: "Good signal; some false positives expected"
+  low:
+    weight: 0.4
+    description: "Heuristic; higher false positive rate"
+
+# Category definitions and their subscore mapping
+categories:
+  shell:
+    subscore: shell
+    description: "Command execution risk"
+  network:
+    subscore: network
+    description: "Network access and exfiltration risk"
+  filesystem:
+    subscore: filesystem
+    description: "File system access risk"
+  credentials:
+    subscore: credentials
+    description: "Credential exposure risk"
+  obfuscation:
+    subscore: shell
+    description: "Code obfuscation (maps to shell subscore)"
+  supply-chain:
+    subscore: network
+    description: "Supply chain risk (maps to network subscore)"
+  gha:
+    subscore: shell  # Default; some GHA rules may map differently
+    description: "GitHub Actions risk"
+  macos:
+    subscore: filesystem
+    description: "macOS-specific risk (maps to filesystem subscore)"
+  windows:
+    subscore: filesystem
+    description: "Windows-specific risk (maps to filesystem subscore)"
+
+# Subscore category weights for total score calculation
+subscore_weights:
+  shell: 0.30
+  network: 0.25
+  filesystem: 0.20
+  credentials: 0.25
+
+# Score range interpretation
+score_ranges:
+  - min: 0
+    max: 19
+    level: "low"
+    label: "Low Risk"
+    recommendation: "Safe to use with standard caution"
+  - min: 20
+    max: 39
+    level: "moderate"
+    label: "Moderate Risk"
+    recommendation: "Review findings before use"
+  - min: 40
+    max: 59
+    level: "high"
+    label: "High Risk"
+    recommendation: "Careful review required; apply policy"
+  - min: 60
+    max: 79
+    level: "very-high"
+    label: "Very High Risk"
+    recommendation: "Not recommended without strict policy enforcement"
+  - min: 80
+    max: 100
+    level: "critical"
+    label: "Critical Risk"
+    recommendation: "Do not install without thorough manual audit"
+
+# File type to extensions mapping
+file_type_extensions:
+  shell: [".sh", ".bash", ".zsh", ".ksh", ".fish"]
+  powershell: [".ps1", ".psm1", ".psd1"]
+  javascript: [".js", ".mjs", ".cjs"]
+  typescript: [".ts", ".mts", ".cts"]
+  python: [".py"]
+  yaml-workflow: []  # Matched by path pattern: .github/workflows/*.yml
+  yaml-config: [".yml", ".yaml"]
+  markdown: [".md", ".mdx"]
+  json-config: [".json"]
+  dockerfile: []  # Matched by filename: Dockerfile, *.dockerfile

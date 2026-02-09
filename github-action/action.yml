@@ -1,0 +1,24 @@
+name: "OpenGuard Scan"
+description: "Scan pull requests with OpenGuard and post security findings"
+inputs:
+  fail-on-score:
+    description: "Fail check if total score >= this value"
+    required: false
+    default: "80"
+  comment:
+    description: "Post PR comment with report"
+    required: false
+    default: "true"
+  diff-only:
+    description: "Only report new findings vs base"
+    required: false
+    default: "true"
+  rules:
+    description: "Path to custom rules directory"
+    required: false
+  policy:
+    description: "Path to existing policy for validation"
+    required: false
+runs:
+  using: "node20"
+  main: "dist/index.js"

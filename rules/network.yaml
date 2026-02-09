@@ -1,0 +1,105 @@
+# OpenGuard Rules — Network / Exfiltration
+# These rules detect suspicious network access patterns.
+
+rules:
+  - id: OG-NET-001
+    title: "Suspicious file upload"
+    description: "Detects commands that upload local files to remote servers, which may indicate data exfiltration."
+    severity: high
+    confidence: medium
+    category: network
+    scope:
+      file_types: [shell, powershell, yaml-workflow, python]
+    patterns:
+      - regex: 'curl\s+(-[A-Za-z]+\s+)*-F\s+'
+        description: "curl with form file upload (-F)"
+      - regex: 'curl\s+(-[A-Za-z]+\s+)*--data-binary\s+@'
+        description: "curl with binary file upload (--data-binary @file)"
+      - regex: 'curl\s+(-[A-Za-z]+\s+)*--upload-file\s+'
+        description: "curl with file upload (--upload-file)"
+      - regex: '\bscp\s+[^\s]+\s+[^\s]+@[^\s]+:'
+        description: "scp to remote host"
+      - regex: '\brsync\s+.*[^\s]+@[^\s]+:'
+        description: "rsync to remote host"
+    remediation: "Verify the upload destination is trusted. Use signed URLs from known services."
+    tags: [exfiltration, upload, network]
+
+  - id: OG-NET-002
+    title: "Raw IP outbound connection"
+    description: "Detects HTTP connections to raw IP addresses instead of domain names. This bypasses domain-based security controls and is harder to trace."
+    severity: high
+    confidence: medium
+    category: network
+    scope:
+      file_types: [shell, powershell, javascript, typescript, python, yaml-workflow]
+    patterns:
+      - regex: 'https?://\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}'
+        description: "HTTP/HTTPS to IP address"
+      - regex: 'curl\s+[^-]*\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}'
+        description: "curl to IP address"
+      - regex: 'wget\s+[^-]*\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}'
+        description: "wget to IP address"
+    remediation: "Use domain names for legitimate services. IP-based connections are suspicious unless justified."
+    tags: [network, ip-address, evasion]
+
+  - id: OG-NET-003
+    title: "DNS exfiltration indicators"
+    description: "Detects patterns that may indicate DNS-based data exfiltration, where data is encoded into DNS queries."
+    severity: high
+    confidence: low
+    category: network
+    scope:
+      file_types: [shell, python]
+    patterns:
+      - regex: '\bdig\s+[^\s]*\.\w+\.\w+\.\w+\.\w+'
+        description: "dig with deeply nested subdomains"
+      - regex: '\bnslookup\s+[^\s]*\.\w+\.\w+\.\w+\.\w+'
+        description: "nslookup with deeply nested subdomains"
+      - regex: 'burpcollaborator\.net'
+        description: "Burp Collaborator domain (common in testing/attack)"
+      - regex: 'interact\.sh'
+        description: "interact.sh domain (out-of-band testing)"
+    remediation: "Investigate the purpose of DNS lookups with unusual subdomain patterns."
+    tags: [exfiltration, dns, network]
+
+  - id: OG-NET-004
+    title: "Webhook / notification service exfiltration"
+    description: "Detects data being sent to webhook or notification services, which could be used for exfiltration disguised as legitimate notifications."
+    severity: medium
+    confidence: medium
+    category: network
+    scope:
+      file_types: [shell, javascript, typescript, python, yaml-workflow]
+    patterns:
+      - regex: 'discord\.com/api/webhooks/'
+        description: "Discord webhook"
+      - regex: 'hooks\.slack\.com/services/'
+        description: "Slack webhook"
+      - regex: 'api\.telegram\.org/bot'
+        description: "Telegram bot API"
+      - regex: 'hooks\.zapier\.com/'
+        description: "Zapier webhook"
+    remediation: "Verify webhook destinations are controlled by the user. Ensure no sensitive data is sent."
+    tags: [exfiltration, webhook, network]
+
+  - id: OG-NET-005
+    title: "Reverse shell indicators"
+    description: "Detects patterns commonly used to establish reverse shell connections, giving a remote attacker interactive shell access."
+    severity: critical
+    confidence: high
+    category: network
+    scope:
+      file_types: [shell, python, powershell]
+    patterns:
+      - regex: 'bash\s+-i\s+>&\s+/dev/tcp/'
+        description: "Bash reverse shell via /dev/tcp"
+      - regex: '\bnc\s+(-[A-Za-z]+\s+)*-e\s+/bin/(ba)?sh'
+        description: "Netcat reverse shell"
+      - regex: 'python[23]?\s+-c\s+.*socket.*subprocess'
+        description: "Python reverse shell"
+      - regex: 'mkfifo\s+/tmp/.*\|\s*/bin/(ba)?sh'
+        description: "Named pipe reverse shell"
+      - regex: 'socat\s+.*exec.*bash'
+        description: "Socat reverse shell"
+    remediation: "This is almost certainly malicious. Do not execute."
+    tags: [reverse-shell, rce, critical]

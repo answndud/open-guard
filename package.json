@@ -1,0 +1,80 @@
+{
+  "name": "openguard",
+  "version": "0.1.0",
+  "description": "Security scanner & trust layer for AI agent skills and workflows",
+  "license": "Apache-2.0",
+  "type": "module",
+  "bin": {
+    "openguard": "./dist/cli/index.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist/",
+    "rules/",
+    "schemas/"
+  ],
+  "scripts": {
+    "dev": "tsx src/cli/index.ts",
+    "build": "tsup",
+    "build:action": "tsup --config github-action/tsup.config.ts",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest watch",
+    "test:coverage": "vitest run --coverage --passWithNoTests",
+    "lint": "eslint src/ tests/ --no-error-on-unmatched-pattern",
+    "lint:fix": "eslint src/ tests/ --fix --no-error-on-unmatched-pattern",
+    "format": "prettier --write 'src/**/*.ts' 'tests/**/*.ts'",
+    "format:check": "prettier --check 'src/**/*.ts' 'tests/**/*.ts'",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist/",
+    "prepublishOnly": "pnpm run clean && pnpm run build"
+  },
+  "dependencies": {
+    "commander": "^12.0.0",
+    "js-yaml": "^4.1.0",
+    "simple-git": "^3.22.0",
+    "@noble/ed25519": "^2.1.0",
+    "chalk": "^5.3.0",
+    "glob": "^11.0.0",
+    "@actions/core": "^1.10.1",
+    "@actions/github": "^6.0.0"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^20.11.0",
+    "typescript": "^5.4.0",
+    "tsup": "^8.0.0",
+    "tsx": "^4.7.0",
+    "vitest": "^2.0.0",
+    "eslint": "^9.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "prettier": "^3.2.0",
+    "@vitest/coverage-v8": "^2.0.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "keywords": [
+    "security",
+    "scanner",
+    "ai-agent",
+    "skills",
+    "policy",
+    "trust",
+    "slsa",
+    "supply-chain",
+    "opencode",
+    "cursor",
+    "mcp"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/openguard/openguard.git"
+  },
+  "homepage": "https://openguard.dev",
+  "bugs": {
+    "url": "https://github.com/openguard/openguard/issues"
+  },
+  "packageManager": "pnpm@10.29.2+sha512.bef43fa759d91fd2da4b319a5a0d13ef7a45bb985a3d7342058470f9d2051a3ba8674e629672654686ef9443ad13a82da2beb9eeb3e0221c87b8154fff9d74b8"
+}

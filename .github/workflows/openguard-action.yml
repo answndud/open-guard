@@ -1,0 +1,101 @@
+# OpenGuard PR Scanner Action Template
+# This is the template for the GitHub Action that scans PRs for risky patterns.
+# Usage: Copy this to your repo's .github/workflows/ directory.
+
+name: OpenGuard Scan
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write  # Required to post PR comments
+
+jobs:
+  scan:
+    name: OpenGuard Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for diff-based scanning
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install OpenGuard
+        run: npm install -g openguard
+
+      - name: Run scan (full)
+        id: scan
+        run: |
+          # Scan the repository
+          openguard scan . \
+            --format json \
+            --out /tmp/openguard-report.json \
+            --diff-base origin/${{ github.base_ref }} \
+            --threshold 80
+        continue-on-error: true
+
+      - name: Generate Markdown report
+        if: always()
+        run: |
+          openguard scan . \
+            --format md \
+            --out /tmp/openguard-report.md \
+            --diff-base origin/${{ github.base_ref }}
+
+      - name: Post PR comment
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const reportPath = '/tmp/openguard-report.md';
+            
+            let body = '## OpenGuard Scan Report\n\n';
+            if (fs.existsSync(reportPath)) {
+              body += fs.readFileSync(reportPath, 'utf8');
+            } else {
+              body += '⚠️ Report generation failed. Check the action logs.';
+            }
+            
+            // Add marker for idempotent updates
+            body += '\n\n<!-- openguard-scan-comment -->';
+            
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            
+            const existing = comments.find(c => 
+              c.body && c.body.includes('<!-- openguard-scan-comment -->')
+            );
+            
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+      - name: Check threshold
+        if: steps.scan.outcome == 'failure'
+        run: |
+          echo "::error::OpenGuard scan found risk score exceeding threshold"
+          exit 1

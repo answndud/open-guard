@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OpenGuard Dashboard</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">OpenGuard Local Dashboard</p>
+          <h1>Scan visibility, without leaving your machine.</h1>
+          <p class="subtitle">
+            Latest scan score, findings, and policy status from your local runs.
+          </p>
+        </div>
+        <div class="stat" id="summary-card">
+          <div class="stat-label">Latest score</div>
+          <div class="stat-value" id="summary-score">--</div>
+          <div class="stat-meta" id="summary-risk">No data</div>
+        </div>
+      </header>
+
+      <section class="grid">
+        <div class="panel">
+          <div class="panel-header">
+            <h2>Score trend</h2>
+            <span class="panel-meta" id="trend-meta">No runs yet</span>
+          </div>
+          <div class="panel-body">
+            <svg id="trend-chart" viewBox="0 0 300 120"></svg>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-header">
+            <h2>Latest findings</h2>
+            <span class="panel-meta" id="findings-meta">--</span>
+          </div>
+          <div class="panel-body" id="findings-list">
+            <p class="empty">No findings yet.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Recent runs</h2>
+          <span class="panel-meta" id="runs-meta">--</span>
+        </div>
+        <div class="panel-body">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Run ID</th>
+                <th>Score</th>
+                <th>Policy</th>
+              </tr>
+            </thead>
+            <tbody id="runs-table">
+              <tr>
+                <td colspan="3" class="empty">No runs saved yet.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <footer class="footer">
+        <div>
+          Save runs with: <code>openguard scan &lt;target&gt; --save-run</code>
+        </div>
+      </footer>
+    </div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

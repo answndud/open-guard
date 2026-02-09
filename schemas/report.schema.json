@@ -1,0 +1,184 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openguard.dev/schemas/report.schema.json",
+  "title": "ScanReport",
+  "description": "OpenGuard scan report containing findings, scores, and recommended policy",
+  "type": "object",
+  "required": ["tool", "target", "summary", "findings"],
+  "properties": {
+    "tool": {
+      "type": "object",
+      "required": ["name", "version"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "const": "openguard",
+          "description": "Tool identifier"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+",
+          "description": "Tool version (SemVer)"
+        }
+      },
+      "additionalProperties": false
+    },
+    "target": {
+      "type": "object",
+      "required": ["input"],
+      "properties": {
+        "input": {
+          "type": "string",
+          "description": "Original scan target (path or URL)"
+        },
+        "resolved_path": {
+          "type": "string",
+          "description": "Resolved absolute path to scanned directory"
+        },
+        "commit": {
+          "type": "string",
+          "description": "Git commit SHA if available"
+        },
+        "branch": {
+          "type": "string",
+          "description": "Git branch name if available"
+        },
+        "files_scanned": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total number of files scanned"
+        },
+        "files_skipped": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of files skipped (too large, binary, etc.)"
+        }
+      },
+      "additionalProperties": false
+    },
+    "summary": {
+      "type": "object",
+      "required": ["total_score", "subscores", "counts", "risk_level"],
+      "properties": {
+        "total_score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Overall risk score (0-100)"
+        },
+        "subscores": {
+          "type": "object",
+          "required": ["shell", "network", "filesystem", "credentials"],
+          "properties": {
+            "shell": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100,
+              "description": "Shell/command execution risk subscore"
+            },
+            "network": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100,
+              "description": "Network/exfiltration risk subscore"
+            },
+            "filesystem": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100,
+              "description": "Filesystem access risk subscore"
+            },
+            "credentials": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100,
+              "description": "Credential exposure risk subscore"
+            }
+          },
+          "additionalProperties": false
+        },
+        "counts": {
+          "type": "object",
+          "required": ["critical", "high", "medium", "low", "info", "total"],
+          "properties": {
+            "critical": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "high": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "medium": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "low": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "info": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "total": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Total number of findings"
+            }
+          },
+          "additionalProperties": false
+        },
+        "risk_level": {
+          "type": "string",
+          "enum": ["low", "moderate", "high", "very-high", "critical"],
+          "description": "Human-readable risk level derived from total_score"
+        }
+      },
+      "additionalProperties": false
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "$ref": "finding.schema.json"
+      },
+      "description": "Array of security findings, ordered by severity (critical first)"
+    },
+    "recommended_policy": {
+      "type": "object",
+      "description": "Auto-generated least-privilege policy based on findings (conforms to policy.schema.json)"
+    },
+    "scan_metadata": {
+      "type": "object",
+      "properties": {
+        "started_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Scan start time (ISO 8601)"
+        },
+        "completed_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Scan completion time (ISO 8601)"
+        },
+        "duration_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Scan duration in milliseconds"
+        },
+        "rules_loaded": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of rules loaded"
+        },
+        "rules_version": {
+          "type": "string",
+          "description": "Version of the rule set used"
+        }
+      },
+      "additionalProperties": false,
+      "description": "Metadata about the scan execution"
+    }
+  },
+  "additionalProperties": false
+}

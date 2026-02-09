@@ -1,0 +1,87 @@
+# OpenGuard Rules — GitHub Actions
+# These rules detect risky patterns in GitHub Actions workflow files.
+
+rules:
+  - id: OG-GHA-001
+    title: "Overly broad workflow permissions"
+    description: "Detects GitHub Actions workflows with overly broad permissions. Compromised actions could modify the repository, create releases, or merge PRs."
+    severity: high
+    confidence: high
+    category: gha
+    scope:
+      file_types: [yaml-workflow]
+    patterns:
+      - regex: 'permissions:\s*write-all'
+        description: "permissions: write-all (all write permissions)"
+      - regex: 'permissions:\s*\n\s+contents:\s*write\s*\n\s+pull-requests:\s*write'
+        description: "Both contents and pull-requests write permissions"
+    remediation: "Use minimum required permissions per job. See https://docs.github.com/en/actions/security-guides/automatic-token-authentication"
+    tags: [gha, permissions, security]
+
+  - id: OG-GHA-002
+    title: "Unpinned action versions"
+    description: "Detects GitHub Actions used with mutable references (branches or tags) instead of pinned commit SHAs. Actions could be modified after initial review."
+    severity: medium
+    confidence: medium
+    category: gha
+    scope:
+      file_types: [yaml-workflow]
+    patterns:
+      - regex: 'uses:\s+[^\s]+@(main|master|develop|latest)\s*$'
+        description: "Action pinned to branch name"
+      - regex: 'uses:\s+[^\s]+@v\d+\s*$'
+        description: "Action pinned to major version tag (mutable)"
+    remediation: "Pin actions to full commit SHA (e.g., uses: actions/checkout@abc123def456...)"
+    tags: [gha, supply-chain, pinning]
+
+  - id: OG-GHA-003
+    title: "Dangerous workflow triggers"
+    description: "Detects workflow triggers that can lead to code execution from untrusted sources (forks) with access to repository secrets."
+    severity: medium
+    confidence: medium
+    category: gha
+    scope:
+      file_types: [yaml-workflow]
+    patterns:
+      - regex: 'on:\s*\n\s+pull_request_target:'
+        description: "pull_request_target trigger (runs with repo secrets, fork code)"
+      - regex: 'on:\s*\[?pull_request_target'
+        description: "pull_request_target trigger (inline)"
+      - regex: 'on:\s*\n\s+issue_comment:'
+        description: "issue_comment trigger (user-controlled input)"
+    remediation: "Use pull_request instead of pull_request_target. Never checkout PR head with secrets."
+    tags: [gha, triggers, security]
+
+  - id: OG-GHA-004
+    title: "Script injection via expressions"
+    description: "Detects unsanitized GitHub event data used directly in run steps. Attackers can control issue titles, PR bodies, etc. to inject commands."
+    severity: high
+    confidence: high
+    category: gha
+    scope:
+      file_types: [yaml-workflow]
+    patterns:
+      - regex: 'run:.*\$\{\{\s*github\.event\.(issue|pull_request|comment)\.(title|body|name)\s*\}\}'
+        description: "Unsanitized event data in run step"
+      - regex: 'run:.*\$\{\{\s*github\.event\.comment\.body\s*\}\}'
+        description: "Comment body in run step"
+      - regex: 'run:.*\$\{\{\s*github\.head_ref\s*\}\}'
+        description: "Head ref in run step (user-controlled branch name)"
+    remediation: "Use intermediate environment variable instead of direct expression interpolation in run steps"
+    tags: [gha, injection, security]
+
+  - id: OG-GHA-005
+    title: "Self-hosted runner risks"
+    description: "Detects use of self-hosted runners, which can be vulnerable to persistent state attacks from fork PRs."
+    severity: medium
+    confidence: low
+    category: gha
+    scope:
+      file_types: [yaml-workflow]
+    patterns:
+      - regex: 'runs-on:\s*self-hosted'
+        description: "Self-hosted runner"
+      - regex: 'runs-on:\s*\[self-hosted'
+        description: "Self-hosted runner in array"
+    remediation: "Use ephemeral runners. Restrict self-hosted runners to private repositories only."
+    tags: [gha, runner, security]

@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openguard.dev/schemas/finding.schema.json",
+  "title": "Finding",
+  "description": "A single security finding detected by OpenGuard scanner",
+  "type": "object",
+  "required": ["id", "rule_id", "severity", "category", "confidence", "title", "description", "evidence"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 16,
+      "description": "Stable finding identifier: sha256(rule_id + path + start_line + match).slice(0, 12)"
+    },
+    "rule_id": {
+      "type": "string",
+      "pattern": "^OG-[A-Z]+-[0-9]{3}$",
+      "description": "Rule identifier (e.g., OG-SHELL-001)"
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["info", "low", "medium", "high", "critical"],
+      "description": "Severity level of the finding"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "shell",
+        "network",
+        "filesystem",
+        "credentials",
+        "obfuscation",
+        "supply-chain",
+        "gha",
+        "macos",
+        "windows"
+      ],
+      "description": "Risk category classification"
+    },
+    "confidence": {
+      "type": "string",
+      "enum": ["low", "medium", "high"],
+      "description": "Detection confidence level"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-readable title of the finding"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Detailed description of the risk"
+    },
+    "remediation": {
+      "type": "string",
+      "description": "Suggested safer alternative or fix"
+    },
+    "evidence": {
+      "type": "object",
+      "required": ["path", "start_line", "end_line", "snippet"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Relative file path from scan target root"
+        },
+        "start_line": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Starting line number (1-indexed)"
+        },
+        "end_line": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Ending line number (1-indexed, inclusive)"
+        },
+        "snippet": {
+          "type": "string",
+          "description": "Code snippet with ±3 lines context"
+        },
+        "match": {
+          "type": "string",
+          "description": "The specific text that matched the rule pattern"
+        }
+      },
+      "additionalProperties": false
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Optional categorization tags"
+    }
+  },
+  "additionalProperties": false
+}

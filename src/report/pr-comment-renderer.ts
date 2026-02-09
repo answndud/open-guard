@@ -1,0 +1,130 @@
+import type { ScanReport } from "./types.js";
+import type { Finding } from "../scanner/types.js";
+import { riskLevelForScore } from "./report-utils.js";
+
+const COMMENT_MARKER = "<!-- openguard-pr-comment -->";
+
+export interface PrCommentInput {
+  readonly head: ScanReport;
+  readonly base?: ScanReport;
+}
+
+export function renderPrComment(input: PrCommentInput): string {
+  const head = input.head;
+  const base = input.base;
+  const headScore = head.summary.total_score;
+  const baseScore = base?.summary.total_score ?? 0;
+  const delta = headScore - baseScore;
+  const deltaLabel = formatDelta(delta);
+  const newFindings = base
+    ? diffFindings(base.findings, head.findings)
+    : head.findings;
+
+  const lines: string[] = [];
+  lines.push(COMMENT_MARKER);
+  lines.push("## 🛡️ OpenGuard Scan Report");
+  lines.push("");
+  lines.push(
+    `**Risk Score:** ${headScore}/100 (${formatRiskLabel(
+      riskLevelForScore(headScore),
+    )}) ${deltaLabel}`,
+  );
+  lines.push("");
+  lines.push("| Category | Score | Findings |");
+  lines.push("| --- | --- | --- |");
+  lines.push(
+    `| Shell | ${head.summary.subscores.shell} | ${countCategories(head, [
+      "shell",
+      "obfuscation",
+      "gha",
+    ])} |`,
+  );
+  lines.push(
+    `| Network | ${head.summary.subscores.network} | ${countCategories(head, [
+      "network",
+      "supply-chain",
+    ])} |`,
+  );
+  lines.push(
+    `| Filesystem | ${head.summary.subscores.filesystem} | ${countCategories(
+      head,
+      ["filesystem", "macos", "windows"],
+    )} |`,
+  );
+  lines.push(
+    `| Credentials | ${head.summary.subscores.credentials} | ${countCategories(
+      head,
+      ["credentials"],
+    )} |`,
+  );
+
+  lines.push("");
+  lines.push("### New Findings");
+  lines.push("");
+  if (newFindings.length === 0) {
+    lines.push("No new findings in this change set.");
+  } else {
+    lines.push("| ID | Severity | Rule | File | Line |");
+    lines.push("| --- | --- | --- | --- | --- |");
+    for (const finding of newFindings) {
+      lines.push(
+        `| \`${finding.id}\` | ${formatSeverity(
+          finding.severity,
+        )} | ${finding.rule_id} | \`${finding.evidence.path}\` | L${finding.evidence.start_line} |`,
+      );
+    }
+  }
+
+  return lines.join("\n");
+}
+
+function diffFindings(
+  base: readonly Finding[],
+  head: readonly Finding[],
+): Finding[] {
+  const baseIds = new Set(base.map((finding) => finding.id));
+  return head.filter((finding) => !baseIds.has(finding.id));
+}
+
+function countCategories(
+  report: ScanReport,
+  categories: readonly string[],
+): number {
+  return report.findings.filter((finding) =>
+    categories.includes(finding.category),
+  ).length;
+}
+
+function formatSeverity(severity: string): string {
+  switch (severity) {
+    case "critical":
+      return "🔴 Critical";
+    case "high":
+      return "🟠 High";
+    case "medium":
+      return "🟡 Medium";
+    case "low":
+      return "🟢 Low";
+    case "info":
+      return "⚪ Info";
+    default:
+      return severity;
+  }
+}
+
+function formatRiskLabel(level: string): string {
+  switch (level) {
+    case "very-high":
+      return "Very High";
+    default:
+      return level.charAt(0).toUpperCase() + level.slice(1);
+  }
+}
+
+function formatDelta(delta: number): string {
+  if (delta === 0) {
+    return "(no change)";
+  }
+  const sign = delta > 0 ? "⬆️" : "⬇️";
+  return `${sign} ${delta > 0 ? "+" : ""}${delta}`;
+}

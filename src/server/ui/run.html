@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OpenGuard Run Details</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Run details</p>
+          <h1 id="run-title">Run</h1>
+          <p class="subtitle" id="run-subtitle">Loading run details.</p>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Total score</div>
+          <div class="stat-value" id="run-score">--</div>
+          <div class="stat-meta" id="run-risk">--</div>
+        </div>
+      </header>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Findings</h2>
+          <span class="panel-meta" id="run-findings-meta">--</span>
+        </div>
+        <div class="panel-body">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Severity</th>
+                <th>Rule</th>
+                <th>File</th>
+                <th>Line</th>
+              </tr>
+            </thead>
+            <tbody id="run-findings-table">
+              <tr>
+                <td colspan="5" class="empty">No findings yet.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <footer class="footer">
+        <a href="/">Back to dashboard</a>
+      </footer>
+    </div>
+
+    <script src="/run.js"></script>
+  </body>
+</html>

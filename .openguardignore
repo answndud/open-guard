@@ -1,0 +1,30 @@
+# Files and directories that OpenGuard should not scan
+# Follows .gitignore syntax
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Test fixtures (contain intentionally risky patterns)
+tests/fixtures/
+
+# Example files (contain intentionally risky patterns for documentation)
+examples/sample-skill/
+
+# Docs
+docs/
+
+# Coverage
+coverage/
+
+# Local data
+.openguard/
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
