@@ -1,11 +1,14 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { simpleGit } from "simple-git";
 import { loadTarget } from "../ingest/repo-loader.js";
+import { discoverFiles } from "../ingest/file-discovery.js";
 import { loadRules } from "../scanner/rule-loader.js";
 import { scanTarget } from "../scanner/rule-engine.js";
 import { calculateScore } from "../scoring/score-calculator.js";
 import { generatePolicy } from "../policy/policy-inferrer.js";
 import { buildJsonReport } from "../report/json-reporter.js";
+import { renderSarifReport } from "../report/sarif-reporter.js";
 import {
   renderMarkdownReport,
   type MarkdownRenderOptions,
@@ -13,6 +16,8 @@ import {
 import { serializePolicy } from "../policy/policy-serializer.js";
 import { resolveDataDir, writeRun } from "../server/store.js";
 import type { ScanReport } from "../report/types.js";
+import type { Finding, Rule, RuleMeta } from "../scanner/types.js";
+import type { RepoContext } from "../ingest/types.js";
 
 export interface ScanOptions {
   readonly target: string;
@@ -38,17 +43,13 @@ export async function runScanCommand(
   options: ScanOptions,
   toolVersion: string,
 ): Promise<ScanResult> {
-  if (options.diffBase) {
-    throw new Error("diff-base is not implemented yet");
-  }
-  if (options.format === "sarif") {
-    throw new Error("sarif output is not implemented yet");
-  }
-
   const rulesDir = options.rulesDir ?? path.join(process.cwd(), "rules");
   const repoContext = await loadTarget(options.target);
   const { rules, meta } = await loadRules(rulesDir);
-  const findings = await scanTarget(repoContext.files, rules, meta);
+  const scanResult = options.diffBase
+    ? await scanWithDiffBase(repoContext, options.diffBase, rules, meta)
+    : await scanCurrent(repoContext, rules, meta);
+  const findings = scanResult.findings;
   const score = calculateScore(findings);
   const recommendedPolicy = generatePolicy(findings, repoContext);
 
@@ -73,10 +74,7 @@ export async function runScanCommand(
     },
   });
 
-  const output =
-    options.format === "json"
-      ? JSON.stringify(report, null, 2)
-      : renderMarkdownReport(report, buildMarkdownOptions(options));
+  const output = buildOutput(report, options);
 
   if (options.out) {
     await fs.writeFile(options.out, output, "utf8");
@@ -93,6 +91,63 @@ export async function runScanCommand(
   }
 
   return { report, output };
+}
+
+function buildOutput(report: ScanReport, options: ScanOptions): string {
+  if (options.format === "json") {
+    return JSON.stringify(report, null, 2);
+  }
+  if (options.format === "sarif") {
+    return renderSarifReport(report);
+  }
+  return renderMarkdownReport(report, buildMarkdownOptions(options));
+}
+
+async function scanCurrent(
+  repoContext: RepoContext,
+  rules: readonly Rule[],
+  meta: RuleMeta,
+): Promise<{ findings: Finding[] }> {
+  const findings = await scanTarget(repoContext.files, rules, meta);
+  return { findings };
+}
+
+async function scanWithDiffBase(
+  repoContext: RepoContext,
+  diffBase: string,
+  rules: readonly Rule[],
+  meta: RuleMeta,
+): Promise<{ findings: Finding[] }> {
+  const git = simpleGit({ baseDir: repoContext.rootPath });
+  const isRepo = await git.checkIsRepo();
+  if (!isRepo) {
+    throw new Error("diff-base requires a git repository target");
+  }
+
+  const status = await git.status();
+  if (!status.isClean()) {
+    throw new Error(
+      "diff-base requires a clean working tree. Commit or stash changes first.",
+    );
+  }
+
+  const headRef = await git.revparse(["HEAD"]);
+  const headFindings = await scanTarget(repoContext.files, rules, meta);
+
+  let baseFindings: Finding[] = [];
+  try {
+    await git.checkout(diffBase);
+    const baseFiles = await discoverFiles(repoContext.rootPath);
+    baseFindings = await scanTarget(baseFiles, rules, meta);
+  } finally {
+    await git.checkout(headRef);
+  }
+
+  const baseIds = new Set(baseFindings.map((finding) => finding.id));
+  const newFindings = headFindings.filter(
+    (finding) => !baseIds.has(finding.id),
+  );
+  return { findings: newFindings };
 }
 
 async function readPolicyFile(policyPath: string): Promise<void> {

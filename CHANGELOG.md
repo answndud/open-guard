@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Added
 
+- SARIF output format for scan reports
+- diff-base scanning to show new findings only
 - Scoring module with deterministic risk score calculation and tests
 - Policy module with safe lists, policy generation, and tests
 - Report module with JSON, Markdown, and PR comment renderers

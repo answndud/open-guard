@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildJsonReport } from "../../src/report/json-reporter.js";
 import { renderMarkdownReport } from "../../src/report/markdown-reporter.js";
+import { renderSarifReport } from "../../src/report/sarif-reporter.js";
 import { renderPrComment } from "../../src/report/pr-comment-renderer.js";
 import { Confidence, Severity } from "../../src/scanner/types.js";
 import type { Finding } from "../../src/scanner/types.js";
@@ -55,5 +56,16 @@ describe("report", () => {
     expect(comment).toContain("openguard-pr-comment");
     expect(comment).toContain("Risk Score");
     expect(comment).toContain("New Findings");
+  });
+
+  it("renders sarif report", () => {
+    const report = buildJsonReport(reportInput);
+    const sarif = JSON.parse(renderSarifReport(report)) as {
+      version: string;
+      runs: Array<{ tool: { driver: { name: string } }; results: unknown[] }>;
+    };
+    expect(sarif.version).toBe("2.1.0");
+    expect(sarif.runs[0]?.tool.driver.name).toBe("OpenGuard");
+    expect(sarif.runs[0]?.results.length).toBe(1);
   });
 });

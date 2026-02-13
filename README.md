@@ -34,17 +34,17 @@ These skills run with access to:
 OpenGuard brings **dependency-grade security** to the AI agent skill supply chain:
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    OpenGuard Pipeline                     │
-│                                                           │
-│  Skill Input ──► Static Scan ──► Risk Score ──► Policy   │
-│  (repo/script)    (rules)        (evidence)    (allowlist)│
-│                                                           │
-│       ┌──────────────┐    ┌──────────────────┐           │
-│       │ PR Comment    │    │ Publisher Sign    │           │
-│       │ (CI Bot)      │    │ (SLSA-lite)      │           │
-│       └──────────────┘    └──────────────────┘           │
-└─────────────────────────────────────────────────────────┘
+
+                    OpenGuard Pipeline
+
+  Skill Input ──► Static Scan ──► Risk Score ──► Policy
+  (repo/script)    (rules)        (evidence)    (allowlist)
+
+       ┌──────────────┐    ┌──────────────────┐
+       │ PR Comment   │    │ Publisher Sign   │
+       │ (CI Bot)     │    │ (SLSA-lite)      │
+       └──────────────┘    └──────────────────┘
+
 ```
 
 ## Features
@@ -79,8 +79,14 @@ openguard scan ./path/to/skill --format json --out report.json
 # Scan a remote GitHub repo
 openguard scan https://github.com/org/repo --format markdown
 
+# Scan only new findings vs base ref
+openguard scan . --diff-base main
+
 # Generate least-privilege policy
 openguard policy generate ./path/to/skill --out openguard.policy.yaml
+
+# Export SARIF for code scanning tools
+openguard scan ./path/to/skill --format sarif --out openguard.sarif
 
 # Generate policy and save a dashboard run
 openguard policy generate ./path/to/skill --out openguard.policy.yaml --save-run
@@ -125,6 +131,14 @@ The bot comments on every PR with:
 - New findings introduced by the PR
 - Suggested policy changes
 - File/line evidence links
+
+## SARIF & Code Scanning
+
+OpenGuard can emit SARIF for GitHub Code Scanning or other tooling:
+
+```bash
+openguard scan ./path/to/skill --format sarif --out openguard.sarif
+```
 
 ## What OpenGuard Scans
 
