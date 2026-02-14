@@ -35,9 +35,6 @@ tmp/
 npm-debug.log*
 pnpm-debug.log*
 
-# Local docs
-guide.md
-
 # Docs
 docs/
 
