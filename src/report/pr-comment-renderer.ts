@@ -58,6 +58,30 @@ export function renderPrComment(input: PrCommentInput): string {
     )} |`,
   );
 
+  const socialSummary = buildSocialEngineeringSummary(head);
+  if (socialSummary.length > 0) {
+    lines.push("");
+    lines.push("### Social Engineering Signals");
+    lines.push("");
+    lines.push("| Signal | Count |");
+    lines.push("| --- | --- |");
+    for (const row of socialSummary) {
+      lines.push(`| ${row[0]} | ${row[1]} |`);
+    }
+  }
+
+  const highSignal = buildHighSignalSummary(newFindings);
+  if (highSignal.length > 0) {
+    lines.push("");
+    lines.push("### New High-Signal Rules");
+    lines.push("");
+    lines.push("| Rule | Hits |");
+    lines.push("| --- | --- |");
+    for (const [ruleId, count] of highSignal) {
+      lines.push(`| ${ruleId} | ${count} |`);
+    }
+  }
+
   lines.push("");
   lines.push("### New Findings");
   lines.push("");
@@ -127,4 +151,44 @@ function formatDelta(delta: number): string {
   }
   const sign = delta > 0 ? "⬆️" : "⬇️";
   return `${sign} ${delta > 0 ? "+" : ""}${delta}`;
+}
+
+function buildSocialEngineeringSummary(report: ScanReport): string[][] {
+  const clipboard = report.findings.filter(
+    (finding) => finding.rule_id === "OG-MD-001",
+  ).length;
+  const verificationBypass = report.findings.filter(
+    (finding) => finding.rule_id === "OG-MD-002",
+  ).length;
+  if (clipboard === 0 && verificationBypass === 0) {
+    return [];
+  }
+  return [
+    ["Clipboard execution instructions", String(clipboard)],
+    ["Verification bypass instructions", String(verificationBypass)],
+  ];
+}
+
+function buildHighSignalSummary(
+  findings: readonly Finding[],
+): Array<[string, string]> {
+  const counts = new Map<string, number>();
+  for (const finding of findings) {
+    const isHighSignal =
+      (finding.severity === "critical" || finding.severity === "high") &&
+      (finding.confidence === "high" || finding.confidence === "medium");
+    if (!isHighSignal) {
+      continue;
+    }
+    counts.set(finding.rule_id, (counts.get(finding.rule_id) ?? 0) + 1);
+  }
+
+  return Array.from(counts.entries())
+    .sort((a, b) => {
+      if (a[1] !== b[1]) {
+        return b[1] - a[1];
+      }
+      return a[0].localeCompare(b[0]);
+    })
+    .map(([ruleId, count]) => [ruleId, String(count)]);
 }

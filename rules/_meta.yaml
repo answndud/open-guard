@@ -60,7 +60,7 @@ categories:
     subscore: network
     description: "Supply chain risk (maps to network subscore)"
   gha:
-    subscore: shell  # Default; some GHA rules may map differently
+    subscore: shell # Default; some GHA rules may map differently
     description: "GitHub Actions risk"
   macos:
     subscore: filesystem
@@ -111,8 +111,9 @@ file_type_extensions:
   javascript: [".js", ".mjs", ".cjs"]
   typescript: [".ts", ".mts", ".cts"]
   python: [".py"]
-  yaml-workflow: []  # Matched by path pattern: .github/workflows/*.yml
+  yaml-workflow: [] # Matched by path pattern: .github/workflows/*.yml
   yaml-config: [".yml", ".yaml"]
   markdown: [".md", ".mdx"]
   json-config: [".json"]
-  dockerfile: []  # Matched by filename: Dockerfile, *.dockerfile
+  dockerfile: [] # Matched by filename: Dockerfile, *.dockerfile
+  mcp-config: [] # Matched by path pattern: mcp*.json|yaml, .mcp.*, opencode.jsonc

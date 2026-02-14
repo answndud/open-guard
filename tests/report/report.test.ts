@@ -25,6 +25,42 @@ const finding: Finding = {
   },
 };
 
+const markdownFinding: Finding = {
+  id: "md123def456",
+  rule_id: "OG-MD-001",
+  severity: Severity.High,
+  category: "shell",
+  confidence: Confidence.Medium,
+  title: "Clipboard to shell execution",
+  description: "Test",
+  remediation: "Test",
+  evidence: {
+    path: "README.md",
+    start_line: 5,
+    end_line: 5,
+    snippet: "pbpaste | bash",
+    match: "pbpaste | bash",
+  },
+};
+
+const highSignalFinding: Finding = {
+  id: "gha123def456",
+  rule_id: "OG-GHA-004",
+  severity: Severity.High,
+  category: "gha",
+  confidence: Confidence.High,
+  title: "Script injection via expressions",
+  description: "Test",
+  remediation: "Test",
+  evidence: {
+    path: ".github/workflows/ci.yml",
+    start_line: 10,
+    end_line: 10,
+    snippet: "run: echo ${{ github.event.issue.title }}",
+    match: "${{ github.event.issue.title }}",
+  },
+};
+
 const reportInput: ReportInput = {
   toolVersion: "0.1.0",
   target: { input: "./demo", resolved_path: "/tmp/demo", files_scanned: 1 },
@@ -48,6 +84,21 @@ describe("report", () => {
     expect(md).toContain("OpenGuard Scan Report");
     expect(md).toContain("Findings");
     expect(md).toContain("OG-SHELL-001");
+  });
+
+  it("renders social engineering summary when markdown signals exist", () => {
+    const report = buildJsonReport({
+      ...reportInput,
+      findings: [markdownFinding, highSignalFinding],
+      subscores: { shell: 15, network: 0, filesystem: 0, credentials: 0 },
+      totalScore: 15,
+    });
+    const md = renderMarkdownReport(report);
+    const comment = renderPrComment({ head: report });
+    expect(md).toContain("Social Engineering Signals");
+    expect(comment).toContain("Social Engineering Signals");
+    expect(comment).toContain("New High-Signal Rules");
+    expect(comment).toContain("OG-GHA-004");
   });
 
   it("renders pr comment with delta", () => {

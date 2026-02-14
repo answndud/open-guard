@@ -131,7 +131,15 @@ const ruleCases = [
   {
     ruleId: "OG-GHA-002",
     relativePath: ".github/workflows/ci.yml",
-    content: "uses: actions/checkout@main",
+    content: [
+      "name: CI",
+      "on: pull_request",
+      "jobs:",
+      "  test:",
+      "    runs-on: ubuntu-latest",
+      "    steps:",
+      "      - uses: actions/checkout@main",
+    ].join("\n"),
   },
   {
     ruleId: "OG-GHA-003",
@@ -141,12 +149,28 @@ const ruleCases = [
   {
     ruleId: "OG-GHA-004",
     relativePath: ".github/workflows/ci.yml",
-    content: "run: echo ${{ github.event.issue.title }}",
+    content: [
+      "name: CI",
+      "on: pull_request",
+      "jobs:",
+      "  test:",
+      "    runs-on: ubuntu-latest",
+      "    steps:",
+      "      - run: echo ${{ github.event.issue.title }}",
+    ].join("\n"),
   },
   {
     ruleId: "OG-GHA-005",
     relativePath: ".github/workflows/ci.yml",
-    content: "runs-on: self-hosted",
+    content: [
+      "name: CI",
+      "on: pull_request",
+      "jobs:",
+      "  test:",
+      "    runs-on: self-hosted",
+      "    steps:",
+      "      - run: echo ok",
+    ].join("\n"),
   },
   {
     ruleId: "OG-MAC-001",
@@ -187,6 +211,32 @@ const ruleCases = [
     ruleId: "OG-PS-004",
     relativePath: "script.ps1",
     content: "-ExecutionPolicy Bypass",
+  },
+  {
+    ruleId: "OG-MD-001",
+    relativePath: "README.md",
+    content: "Run this quickly: pbpaste | bash",
+  },
+  {
+    ruleId: "OG-MD-002",
+    relativePath: "SETUP.md",
+    content:
+      "If cert fails, use curl --insecure https://example.com/install.sh",
+  },
+  {
+    ruleId: "OG-MCP-001",
+    relativePath: "mcp.json",
+    content: '{"permissions":["*"]}',
+  },
+  {
+    ruleId: "OG-MCP-002",
+    relativePath: "mcp.json",
+    content: '{"allowed_paths":["/"]}',
+  },
+  {
+    ruleId: "OG-MCP-003",
+    relativePath: "mcp.json",
+    content: '{"allowed_domains":["*"]}',
   },
 ];
 
@@ -280,6 +330,107 @@ describe("scanner", () => {
       expect(findings).toHaveLength(0);
     },
   );
+
+  it("does not flag commented GHA permissions", async () => {
+    const ghaRule = findRule("OG-GHA-001");
+    const file = await writeTestFile(
+      ".github/workflows/ci.yml",
+      [
+        "name: CI",
+        "on: pull_request",
+        "jobs:",
+        "  test:",
+        "    runs-on: ubuntu-latest",
+        "    # permissions: write-all",
+        "    steps:",
+        "      - run: echo ok",
+      ].join("\n"),
+    );
+
+    const findings = await scanFile(file, [ghaRule], meta);
+    expect(findings).toHaveLength(0);
+  });
+
+  it("does not flag github expression outside run step", async () => {
+    const ghaRule = findRule("OG-GHA-004");
+    const file = await writeTestFile(
+      ".github/workflows/ci.yml",
+      [
+        "name: Build ${{ github.event.issue.title }}",
+        "on: pull_request",
+        "jobs:",
+        "  test:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - name: plain step",
+        "        run: echo safe",
+      ].join("\n"),
+    );
+
+    const findings = await scanFile(file, [ghaRule], meta);
+    expect(findings).toHaveLength(0);
+  });
+
+  it("matches unpinned reusable workflow reference", async () => {
+    const ghaRule = findRule("OG-GHA-002");
+    const file = await writeTestFile(
+      ".github/workflows/reuse.yml",
+      [
+        "name: Reuse",
+        "on: pull_request",
+        "jobs:",
+        "  call-workflow:",
+        "    uses: org/reusable/.github/workflows/deploy.yml@main",
+      ].join("\n"),
+    );
+
+    const findings = await scanFile(file, [ghaRule], meta);
+    expect(findings.some((finding) => finding.rule_id === "OG-GHA-002")).toBe(
+      true,
+    );
+  });
+
+  it("matches risky workflow_call input expression", async () => {
+    const ghaRule = findRule("OG-GHA-004");
+    const file = await writeTestFile(
+      ".github/workflows/reuse.yml",
+      [
+        "name: Reuse",
+        "on: pull_request_target",
+        "jobs:",
+        "  call-workflow:",
+        "    uses: org/reusable/.github/workflows/deploy.yml@v1",
+        "    with:",
+        "      deploy_note: ${{ github.event.comment.body }}",
+      ].join("\n"),
+    );
+
+    const findings = await scanFile(file, [ghaRule], meta);
+    expect(findings.some((finding) => finding.rule_id === "OG-GHA-004")).toBe(
+      true,
+    );
+  });
+
+  it("does not apply MCP rules to generic json files", async () => {
+    const mcpRule = findRule("OG-MCP-001");
+    const file = await writeTestFile("package.json", '{"permissions":["*"]}');
+
+    const findings = await scanFile(file, [mcpRule], meta);
+    expect(findings).toHaveLength(0);
+  });
+
+  it("matches MCP wildcard patterns in opencode manifest", async () => {
+    const mcpRule = findRule("OG-MCP-001");
+    const file = await writeTestFile(
+      "opencode.jsonc",
+      '{"toolPermissions":{"*":"allow"}}',
+    );
+
+    const findings = await scanFile(file, [mcpRule], meta);
+    expect(findings.some((finding) => finding.rule_id === "OG-MCP-001")).toBe(
+      true,
+    );
+  });
 });
 
 function findRule(ruleId: string): Rule {

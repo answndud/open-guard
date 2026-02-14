@@ -1,0 +1,43 @@
+# OpenGuard Rules — Markdown / Social Engineering
+# These rules detect risky install instructions embedded in README/docs.
+
+rules:
+  - id: OG-MD-001
+    title: "Clipboard to shell execution"
+    description: "Detects instructions that execute whatever is currently in the clipboard. This can hide payloads from review and is a common social-engineering tactic."
+    severity: high
+    confidence: medium
+    category: shell
+    scope:
+      file_types: [markdown]
+    patterns:
+      - regex: 'pbpaste\s*\|\s*(ba)?sh'
+        description: "macOS clipboard piped to shell"
+      - regex: 'xclip\s+-o\s*\|\s*(ba)?sh'
+        description: "Linux clipboard piped to shell"
+      - regex: 'Get-Clipboard\s*\|\s*(IEX|Invoke-Expression)'
+        description: "PowerShell clipboard piped to execution"
+    remediation: "Provide explicit, reviewable commands in docs. Avoid clipboard-based execution instructions."
+    tags: [social-engineering, markdown, install]
+
+  - id: OG-MD-002
+    title: "Security checks disabled in install instructions"
+    description: "Detects documentation that asks users to disable TLS, host-key verification, or package signature checks during setup."
+    severity: high
+    confidence: medium
+    category: supply-chain
+    scope:
+      file_types: [markdown]
+    patterns:
+      - regex: 'curl\s+.*(--insecure|-k)\b'
+        description: "curl insecure TLS mode"
+      - regex: 'wget\s+.*--no-check-certificate\b'
+        description: "wget certificate verification disabled"
+      - regex: 'GIT_SSL_NO_VERIFY\s*=\s*1'
+        description: "git SSL verification disabled"
+      - regex: 'npm\s+config\s+set\s+strict-ssl\s+false'
+        description: "npm strict-ssl disabled"
+      - regex: 'StrictHostKeyChecking\s*=\s*no|StrictHostKeyChecking=no'
+        description: "SSH host key checking disabled"
+    remediation: "Keep verification enabled and document trusted cert/key setup instead of bypassing checks."
+    tags: [social-engineering, markdown, supply-chain]

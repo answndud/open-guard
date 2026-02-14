@@ -20,7 +20,7 @@ export function calculateScore(findings: readonly Finding[]): ScoreResult {
 
   for (const finding of findings) {
     const contribution = contributionForFinding(finding);
-    const category = CATEGORY_MAP[finding.category] ?? ScoreCategory.Shell;
+    const category = scoreCategoryForFinding(finding);
     subscores[category] = Math.min(subscores[category] + contribution, 100);
 
     if (finding.severity === "critical") {
@@ -30,6 +30,18 @@ export function calculateScore(findings: readonly Finding[]): ScoreResult {
 
   const total = totalScore(subscores, hasCritical);
   return { total, subscores, hasCritical };
+}
+
+function scoreCategoryForFinding(finding: Finding): ScoreCategory {
+  if (finding.category !== "gha") {
+    return CATEGORY_MAP[finding.category] ?? ScoreCategory.Shell;
+  }
+
+  if (finding.rule_id === "OG-GHA-001") {
+    return ScoreCategory.Credentials;
+  }
+
+  return ScoreCategory.Shell;
 }
 
 function contributionForFinding(finding: Finding): number {

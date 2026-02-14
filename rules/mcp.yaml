@@ -1,0 +1,73 @@
+# OpenGuard Rules — MCP / Tool Manifest
+# These rules detect overly broad tool/permission declarations in manifests.
+
+rules:
+  - id: OG-MCP-001
+    title: "Wildcard tool permissions"
+    description: "Detects manifest policies that grant all tools or all permissions using wildcard/all markers."
+    severity: high
+    confidence: medium
+    category: shell
+    scope:
+      file_types: [mcp-config]
+    patterns:
+      - regex: '"(allowed_tools|tools|permissions|scopes)"\s*:\s*\[\s*"\*"\s*\]'
+        description: "JSON wildcard list for tools/permissions"
+      - regex: '"(allowedTools|toolPermissions|tool_permissions)"\s*:\s*\{[^\}]*"\*"\s*:\s*"(allow|enabled|true)"'
+        description: "JSON wildcard map for tool permissions"
+      - regex: '"(permissions|scope|scopes)"\s*:\s*"(all|\*)"'
+        description: "JSON all-permissions marker"
+      - regex: '(allow|allowed_tools|tools|permissions|scopes):\s*\[\s*"\*"\s*\]'
+        description: "YAML wildcard list for tools/permissions"
+      - regex: '(allowedTools|toolPermissions|tool_permissions):\s*\{\s*"?\*"?\s*:\s*"?(allow|enabled|true)"?\s*\}'
+        description: "YAML wildcard map for tool permissions"
+    remediation: "Replace wildcard permissions with explicit minimum required tool and scope allowlists."
+    tags: [mcp, least-privilege, permissions]
+
+  - id: OG-MCP-002
+    title: "Unrestricted filesystem scope"
+    description: "Detects manifest path grants that include system root or recursive catch-all patterns."
+    severity: high
+    confidence: medium
+    category: filesystem
+    scope:
+      file_types: [mcp-config]
+    patterns:
+      - regex: '"(roots|allowed_paths|paths|filesystem)"\s*:\s*\[[^\]]*"/"'
+        description: "JSON filesystem root allow"
+      - regex: '"(allowedPaths|filesystemRoots|workspaceRoots)"\s*:\s*\[[^\]]*"/"'
+        description: "JSON root-level scope with camelCase keys"
+      - regex: '"(roots|allowed_paths|paths|filesystem)"\s*:\s*\[[^\]]*"/\*\*"'
+        description: "JSON recursive root allow"
+      - regex: '(roots|allowed_paths|paths|filesystem):\s*\[\s*"/"\s*\]'
+        description: "YAML filesystem root allow"
+      - regex: '(roots|allowed_paths|paths|filesystem):\s*\[\s*"/\*\*"\s*\]'
+        description: "YAML recursive root allow"
+      - regex: '(allowedPaths|filesystemRoots|workspaceRoots):\s*\[\s*"/"\s*\]'
+        description: "YAML root-level scope with camelCase keys"
+    remediation: "Constrain filesystem access to project-scoped directories instead of root-level patterns."
+    tags: [mcp, filesystem, least-privilege]
+
+  - id: OG-MCP-003
+    title: "Unrestricted network destination scope"
+    description: "Detects manifest network allowlists that permit all domains/hosts."
+    severity: high
+    confidence: medium
+    category: network
+    scope:
+      file_types: [mcp-config]
+    patterns:
+      - regex: '"(allowed_domains|domains|hosts|allow_hosts)"\s*:\s*\[\s*"\*"\s*\]'
+        description: "JSON wildcard domain/host allow"
+      - regex: '"(allowedDomains|allowedHosts|networkHosts)"\s*:\s*\[\s*"\*"\s*\]'
+        description: "JSON wildcard domain/host allow with camelCase keys"
+      - regex: '(allowed_domains|domains|hosts|allow_hosts):\s*\[\s*"\*"\s*\]'
+        description: "YAML wildcard domain/host allow"
+      - regex: '(allowedDomains|allowedHosts|networkHosts):\s*\[\s*"\*"\s*\]'
+        description: "YAML wildcard domain/host allow with camelCase keys"
+      - regex: '"network"\s*:\s*"(all|allow-all|unrestricted)"'
+        description: "JSON unrestricted network mode"
+      - regex: 'network:\s*(all|allow-all|unrestricted)'
+        description: "YAML unrestricted network mode"
+    remediation: "Allow only known required domains/hosts; deny-by-default for all other destinations."
+    tags: [mcp, network, least-privilege]

@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import yaml from "js-yaml";
 import { loadTarget } from "../ingest/repo-loader.js";
-import { loadRules } from "../scanner/rule-loader.js";
+import { loadRulesWithOverrides } from "../scanner/rule-loader.js";
 import { scanTarget } from "../scanner/rule-engine.js";
 import { calculateScore } from "../scoring/score-calculator.js";
 import { generatePolicy } from "../policy/policy-inferrer.js";
@@ -11,6 +11,7 @@ import { serializePolicy } from "../policy/policy-serializer.js";
 import { validatePolicy } from "../policy/policy-validator.js";
 import { buildJsonReport } from "../report/json-reporter.js";
 import { resolveDataDir, writeRun } from "../server/store.js";
+import { resolveRulesDirectory } from "./runtime-paths.js";
 
 export interface PolicyGenerateOptions {
   readonly target: string;
@@ -25,9 +26,12 @@ export interface PolicyGenerateOptions {
 export async function runPolicyGenerate(
   options: PolicyGenerateOptions,
 ): Promise<string> {
-  const rulesDir = options.rulesDir ?? path.join(process.cwd(), "rules");
+  const rulesDir = await resolveRulesDirectory();
   const repoContext = await loadTarget(options.target);
-  const { rules, meta } = await loadRules(rulesDir);
+  const { rules, meta } = await loadRulesWithOverrides({
+    baseDir: rulesDir,
+    overrideDir: options.rulesDir,
+  });
   const findings = await scanTarget(repoContext.files, rules, meta);
   const generatedPolicy = generatePolicy(findings, repoContext);
   const validatedGenerated = await validatePolicy(generatedPolicy);

@@ -102,4 +102,19 @@ describe("score calculator", () => {
     expect(result.hasCritical).toBe(true);
     expect(result.total).toBeGreaterThanOrEqual(60);
   });
+
+  it("maps GHA permissions rule to credentials subscore", () => {
+    const finding: Finding = {
+      ...baseFinding,
+      id: "gha-permissions",
+      rule_id: "OG-GHA-001",
+      severity: Severity.High,
+      confidence: Confidence.High,
+      category: "gha",
+    };
+
+    const result = calculateScore([finding]);
+    expect(result.subscores.credentials).toBe(15);
+    expect(result.subscores.shell).toBe(0);
+  });
 });

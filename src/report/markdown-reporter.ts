@@ -48,6 +48,14 @@ export function renderMarkdownReport(
         ["Category", "Score", "Findings"],
       ),
     );
+
+    const socialSummary = buildSocialEngineeringSummary(report);
+    if (socialSummary) {
+      lines.push("");
+      lines.push("### Social Engineering Signals");
+      lines.push("");
+      lines.push(socialSummary);
+    }
   }
 
   const findings = applyFindingLimit(report.findings, maxFindings);
@@ -179,4 +187,23 @@ function applyFindingLimit<T>(items: readonly T[], limit?: number): T[] {
     return [...items];
   }
   return items.slice(0, limit);
+}
+
+function buildSocialEngineeringSummary(report: ScanReport): string | null {
+  const clipboard = report.findings.filter(
+    (finding) => finding.rule_id === "OG-MD-001",
+  ).length;
+  const verificationBypass = report.findings.filter(
+    (finding) => finding.rule_id === "OG-MD-002",
+  ).length;
+
+  if (clipboard === 0 && verificationBypass === 0) {
+    return null;
+  }
+
+  const rows = [
+    ["Clipboard execution instructions", String(clipboard)],
+    ["Verification bypass instructions", String(verificationBypass)],
+  ];
+  return renderAsciiTable(rows, ["Signal", "Count"]);
 }

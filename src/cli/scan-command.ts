@@ -1,9 +1,11 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import os from "node:os";
+import yaml from "js-yaml";
 import { simpleGit } from "simple-git";
 import { loadTarget } from "../ingest/repo-loader.js";
 import { discoverFiles } from "../ingest/file-discovery.js";
-import { loadRules } from "../scanner/rule-loader.js";
+import { loadRulesWithOverrides } from "../scanner/rule-loader.js";
 import { scanTarget } from "../scanner/rule-engine.js";
 import { calculateScore } from "../scoring/score-calculator.js";
 import { generatePolicy } from "../policy/policy-inferrer.js";
@@ -14,7 +16,9 @@ import {
   type MarkdownRenderOptions,
 } from "../report/markdown-reporter.js";
 import { serializePolicy } from "../policy/policy-serializer.js";
+import { validatePolicy } from "../policy/policy-validator.js";
 import { resolveDataDir, writeRun } from "../server/store.js";
+import { resolveRulesDirectory } from "./runtime-paths.js";
 import type { ScanReport } from "../report/types.js";
 import type { Finding, Rule, RuleMeta } from "../scanner/types.js";
 import type { RepoContext } from "../ingest/types.js";
@@ -43,9 +47,12 @@ export async function runScanCommand(
   options: ScanOptions,
   toolVersion: string,
 ): Promise<ScanResult> {
-  const rulesDir = options.rulesDir ?? path.join(process.cwd(), "rules");
+  const rulesDir = await resolveRulesDirectory();
   const repoContext = await loadTarget(options.target);
-  const { rules, meta } = await loadRules(rulesDir);
+  const { rules, meta } = await loadRulesWithOverrides({
+    baseDir: rulesDir,
+    overrideDir: options.rulesDir,
+  });
   const scanResult = options.diffBase
     ? await scanWithDiffBase(repoContext, options.diffBase, rules, meta)
     : await scanCurrent(repoContext, rules, meta);
@@ -54,7 +61,7 @@ export async function runScanCommand(
   const recommendedPolicy = generatePolicy(findings, repoContext);
 
   if (options.policyPath) {
-    await readPolicyFile(options.policyPath);
+    await readAndValidatePolicyFile(options.policyPath);
   }
 
   const report = buildJsonReport({
@@ -124,34 +131,38 @@ async function scanWithDiffBase(
     throw new Error("diff-base requires a git repository target");
   }
 
-  const status = await git.status();
-  if (!status.isClean()) {
-    throw new Error(
-      "diff-base requires a clean working tree. Commit or stash changes first.",
-    );
+  const mergeBase = await git.raw(["merge-base", diffBase, "HEAD"]);
+  const baseRef = mergeBase.trim();
+  if (!baseRef) {
+    throw new Error(`Unable to resolve diff base: ${diffBase}`);
   }
 
-  const headRef = await git.revparse(["HEAD"]);
   const headFindings = await scanTarget(repoContext.files, rules, meta);
 
-  let baseFindings: Finding[] = [];
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "openguard-base-"));
   try {
-    await git.checkout(diffBase);
-    const baseFiles = await discoverFiles(repoContext.rootPath);
-    baseFindings = await scanTarget(baseFiles, rules, meta);
-  } finally {
-    await git.checkout(headRef);
-  }
+    const clonePath = path.join(tempDir, "repo");
+    await simpleGit().clone(repoContext.rootPath, clonePath, ["--no-checkout"]);
+    const cloneGit = simpleGit({ baseDir: clonePath });
+    await cloneGit.checkout(baseRef);
 
-  const baseIds = new Set(baseFindings.map((finding) => finding.id));
-  const newFindings = headFindings.filter(
-    (finding) => !baseIds.has(finding.id),
-  );
-  return { findings: newFindings };
+    const baseFiles = await discoverFiles(clonePath);
+    const baseFindings = await scanTarget(baseFiles, rules, meta);
+
+    const baseIds = new Set(baseFindings.map((finding) => finding.id));
+    const newFindings = headFindings.filter(
+      (finding) => !baseIds.has(finding.id),
+    );
+    return { findings: newFindings };
+  } finally {
+    await fs.rm(tempDir, { recursive: true, force: true });
+  }
 }
 
-async function readPolicyFile(policyPath: string): Promise<void> {
-  await fs.readFile(policyPath, "utf8");
+async function readAndValidatePolicyFile(policyPath: string): Promise<void> {
+  const raw = await fs.readFile(policyPath, "utf8");
+  const parsed = yaml.load(raw) as unknown;
+  await validatePolicy(parsed);
 }
 
 function buildMarkdownOptions(options: ScanOptions): MarkdownRenderOptions {

@@ -12,6 +12,25 @@ export interface LoadedRules {
   readonly meta: RuleMeta;
 }
 
+export interface LoadRulesOptions {
+  readonly baseDir: string;
+  readonly overrideDir?: string;
+}
+
+export async function loadRulesWithOverrides(
+  options: LoadRulesOptions,
+): Promise<LoadedRules> {
+  const base = await loadRules(options.baseDir);
+  if (!options.overrideDir) {
+    return base;
+  }
+
+  const override = await loadRules(options.overrideDir);
+  const mergedRules = mergeRules(base.rules, override.rules);
+  const mergedMeta = mergeMeta(base.meta, override.meta);
+  return { rules: mergedRules, meta: mergedMeta };
+}
+
 export async function loadRules(rulesDir: string): Promise<LoadedRules> {
   const metaPath = path.join(rulesDir, "_meta.yaml");
   const meta = await loadMeta(metaPath);
@@ -36,6 +55,31 @@ export async function loadRules(rulesDir: string): Promise<LoadedRules> {
 
   rules.sort((a, b) => a.id.localeCompare(b.id));
   return { rules, meta };
+}
+
+function mergeRules(
+  baseRules: readonly Rule[],
+  overrideRules: readonly Rule[],
+): Rule[] {
+  const merged = new Map<string, Rule>();
+  for (const rule of baseRules) {
+    merged.set(rule.id, rule);
+  }
+  for (const rule of overrideRules) {
+    merged.set(rule.id, rule);
+  }
+  return Array.from(merged.values()).sort((a, b) => a.id.localeCompare(b.id));
+}
+
+function mergeMeta(base: RuleMeta, override: RuleMeta): RuleMeta {
+  return {
+    ...base,
+    ...override,
+    file_type_extensions: {
+      ...base.file_type_extensions,
+      ...override.file_type_extensions,
+    },
+  };
 }
 
 async function loadMeta(metaPath: string): Promise<RuleMeta> {
