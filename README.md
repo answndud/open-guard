@@ -5,6 +5,7 @@
   </p>
   <p align="center">
     <a href="#quickstart">Quickstart</a> ·
+    <a href="GUIDE.md">Beginner Guide</a> ·
     <a href="#features">Features</a> ·
     <a href="ARCHITECTURE.md">Architecture</a> ·
     <a href="docs/ROADMAP.md">Roadmap</a> ·
