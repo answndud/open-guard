@@ -5,6 +5,8 @@ import { renderSarifReport } from "../../src/report/sarif-reporter.js";
 import { renderPrComment } from "../../src/report/pr-comment-renderer.js";
 import { Confidence, Severity } from "../../src/scanner/types.js";
 import type { Finding } from "../../src/scanner/types.js";
+import { ApprovalCategory, ApprovalMode } from "../../src/policy/types.js";
+import type { Policy } from "../../src/policy/types.js";
 import type { ReportInput } from "../../src/report/types.js";
 
 const finding: Finding = {
@@ -69,6 +71,53 @@ const reportInput: ReportInput = {
   totalScore: 80,
 };
 
+const basePolicy: Policy = {
+  version: "v1",
+  defaults: {
+    action: "deny",
+    require_approval_for: [
+      ApprovalCategory.ShellExec,
+      ApprovalCategory.NewDomain,
+    ],
+  },
+  allow: {
+    commands: [{ cmd: "node" }],
+    paths: { read: ["./"], write: [] },
+    network: { domains: ["registry.npmjs.org"], ports: [443] },
+  },
+  deny: {
+    commands: [],
+    paths: [],
+    network: { domains: [] },
+  },
+  approvals: {
+    shell_exec: { mode: ApprovalMode.Prompt, except_allowlisted: true },
+    new_domain: { mode: ApprovalMode.Prompt, except_allowlisted: true },
+    credential_paths: { mode: ApprovalMode.Deny, except_allowlisted: false },
+    file_write: { mode: ApprovalMode.Prompt, except_allowlisted: true },
+    elevated_privilege: {
+      mode: ApprovalMode.TwoStep,
+      except_allowlisted: false,
+    },
+  },
+};
+
+const headPolicy: Policy = {
+  ...basePolicy,
+  allow: {
+    ...basePolicy.allow,
+    commands: [...basePolicy.allow.commands, { cmd: "pnpm" }],
+  },
+  deny: {
+    ...basePolicy.deny,
+    commands: [{ cmd: "curl" }],
+  },
+  approvals: {
+    ...basePolicy.approvals,
+    shell_exec: { mode: ApprovalMode.TwoStep, except_allowlisted: false },
+  },
+};
+
 describe("report", () => {
   it("builds json report", () => {
     const report = buildJsonReport(reportInput);
@@ -107,6 +156,29 @@ describe("report", () => {
     expect(comment).toContain("openguard-pr-comment");
     expect(comment).toContain("Risk Score");
     expect(comment).toContain("New Findings");
+  });
+
+  it("renders policy diff in pr comment", () => {
+    const baseReport = buildJsonReport({
+      ...reportInput,
+      recommendedPolicy: basePolicy,
+      findings: [],
+      totalScore: 10,
+      subscores: { shell: 10, network: 0, filesystem: 0, credentials: 0 },
+    });
+    const headReport = buildJsonReport({
+      ...reportInput,
+      recommendedPolicy: headPolicy,
+      findings: [highSignalFinding],
+      totalScore: 20,
+      subscores: { shell: 20, network: 0, filesystem: 0, credentials: 0 },
+    });
+
+    const comment = renderPrComment({ head: headReport, base: baseReport });
+    expect(comment).toContain("Recommended Policy Changes");
+    expect(comment).toContain("Added allow.commands: `pnpm`");
+    expect(comment).toContain("Added deny.commands: `curl`");
+    expect(comment).toContain("Updated approvals.shell_exec.mode");
   });
 
   it("renders sarif report", () => {

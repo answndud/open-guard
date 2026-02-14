@@ -1,5 +1,6 @@
 import type { ScanReport } from "./types.js";
 import type { Finding } from "../scanner/types.js";
+import type { Policy, CommandRule } from "../policy/types.js";
 import { riskLevelForScore } from "./report-utils.js";
 
 const COMMENT_MARKER = "<!-- openguard-pr-comment -->";
@@ -80,6 +81,21 @@ export function renderPrComment(input: PrCommentInput): string {
     for (const [ruleId, count] of highSignal) {
       lines.push(`| ${ruleId} | ${count} |`);
     }
+  }
+
+  const policyDiff = buildPolicyDiff(
+    base?.recommended_policy,
+    head.recommended_policy,
+  );
+  if (policyDiff.length > 0) {
+    lines.push("");
+    lines.push("<details><summary>📋 Recommended Policy Changes</summary>");
+    lines.push("");
+    for (const line of policyDiff) {
+      lines.push(`- ${line}`);
+    }
+    lines.push("");
+    lines.push("</details>");
   }
 
   lines.push("");
@@ -191,4 +207,124 @@ function buildHighSignalSummary(
       return a[0].localeCompare(b[0]);
     })
     .map(([ruleId, count]) => [ruleId, String(count)]);
+}
+
+function buildPolicyDiff(base?: Policy, head?: Policy): string[] {
+  if (!head) {
+    return [];
+  }
+
+  if (!base) {
+    return [
+      "Generated a recommended policy for this change set.",
+      `Allow commands: ${head.allow.commands.length}`,
+      `Deny commands: ${head.deny.commands.length}`,
+      `Allowed domains: ${head.allow.network.domains.length}`,
+    ];
+  }
+
+  const lines: string[] = [];
+  lines.push(
+    ...diffList(
+      "allow.commands",
+      formatCommands(base.allow.commands),
+      formatCommands(head.allow.commands),
+    ),
+  );
+  lines.push(
+    ...diffList(
+      "allow.paths.read",
+      base.allow.paths.read,
+      head.allow.paths.read,
+    ),
+  );
+  lines.push(
+    ...diffList(
+      "allow.paths.write",
+      base.allow.paths.write,
+      head.allow.paths.write,
+    ),
+  );
+  lines.push(
+    ...diffList(
+      "allow.network.domains",
+      base.allow.network.domains,
+      head.allow.network.domains,
+    ),
+  );
+  lines.push(
+    ...diffList(
+      "deny.commands",
+      formatCommands(base.deny.commands),
+      formatCommands(head.deny.commands),
+    ),
+  );
+  lines.push(...diffList("deny.paths", base.deny.paths, head.deny.paths));
+  lines.push(
+    ...diffList(
+      "deny.network.domains",
+      base.deny.network.domains,
+      head.deny.network.domains,
+    ),
+  );
+  lines.push(...diffApprovals(base, head));
+
+  return lines.length > 0 ? lines : ["No policy changes detected."];
+}
+
+function formatCommands(commands: readonly CommandRule[]): string[] {
+  return commands
+    .map((command) =>
+      command.args && command.args.length > 0
+        ? `${command.cmd} ${command.args.join(" ")}`
+        : command.cmd,
+    )
+    .sort((a, b) => a.localeCompare(b));
+}
+
+function diffList(
+  label: string,
+  baseItems: readonly string[],
+  headItems: readonly string[],
+): string[] {
+  const baseSet = new Set(baseItems);
+  const headSet = new Set(headItems);
+  const added = [...headSet].filter((item) => !baseSet.has(item)).sort();
+  const removed = [...baseSet].filter((item) => !headSet.has(item)).sort();
+  const changes: string[] = [];
+
+  for (const item of added) {
+    changes.push(`Added ${label}: \`${item}\``);
+  }
+  for (const item of removed) {
+    changes.push(`Removed ${label}: \`${item}\``);
+  }
+  return changes;
+}
+
+function diffApprovals(base: Policy, head: Policy): string[] {
+  const keys: Array<keyof Policy["approvals"]> = [
+    "shell_exec",
+    "new_domain",
+    "credential_paths",
+    "file_write",
+    "elevated_privilege",
+  ];
+
+  const changes: string[] = [];
+  for (const key of keys) {
+    const baseValue = base.approvals[key];
+    const headValue = head.approvals[key];
+    if (baseValue.mode !== headValue.mode) {
+      changes.push(
+        `Updated approvals.${key}.mode: \`${baseValue.mode}\` -> \`${headValue.mode}\``,
+      );
+    }
+    if (baseValue.except_allowlisted !== headValue.except_allowlisted) {
+      changes.push(
+        `Updated approvals.${key}.except_allowlisted: \`${String(baseValue.except_allowlisted)}\` -> \`${String(headValue.except_allowlisted)}\``,
+      );
+    }
+  }
+  return changes;
 }
