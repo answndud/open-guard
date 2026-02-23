@@ -71,4 +71,23 @@ describe("run store", () => {
     const report = await loadRunReport(dataDir, run.id);
     expect(report.summary.total_score).toBe(5);
   });
+
+  it("keeps latest ordering for runs created in the same second", async () => {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "openguard-"));
+    const dataDir = resolveDataDir(tempDir);
+
+    const now = new Date("2026-02-09T18:04:00Z");
+    const first = await writeRun(dataDir, makeReport(11), undefined, { now });
+    const second = await writeRun(dataDir, makeReport(22), undefined, { now });
+
+    expect(first.id).not.toBe(second.id);
+
+    const runs = await listRuns(dataDir);
+    expect(runs[0]?.id).toBe(second.id);
+    expect(runs[1]?.id).toBe(first.id);
+
+    const latest = await loadLatestSummary(dataDir);
+    expect(latest.entry.id).toBe(second.id);
+    expect(latest.report.summary.total_score).toBe(22);
+  });
 });

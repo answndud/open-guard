@@ -59,4 +59,31 @@ describe("server api", () => {
 
     await server.close();
   });
+
+  it("returns 400 for invalid run id and 404 for missing run", async () => {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "openguard-"));
+    const dataDir = resolveDataDir(tempDir);
+    const server = await startServer({ port: 0, dataDir });
+    const baseUrl = `http://localhost:${server.port}`;
+
+    const invalidIdResponse = await fetch(`${baseUrl}/api/runs/bad$id`);
+    expect(invalidIdResponse.status).toBe(400);
+
+    const missingRunResponse = await fetch(`${baseUrl}/api/runs/not-found`);
+    expect(missingRunResponse.status).toBe(404);
+
+    await server.close();
+  });
+
+  it("returns 404 for summary when no runs exist", async () => {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "openguard-"));
+    const dataDir = resolveDataDir(tempDir);
+    const server = await startServer({ port: 0, dataDir });
+    const baseUrl = `http://localhost:${server.port}`;
+
+    const summaryResponse = await fetch(`${baseUrl}/api/summary`);
+    expect(summaryResponse.status).toBe(404);
+
+    await server.close();
+  });
 });

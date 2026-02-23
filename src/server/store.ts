@@ -203,5 +203,27 @@ function compareRunEntries(a: RunIndexEntry, b: RunIndexEntry): number {
   if (a.created !== b.created) {
     return a.created > b.created ? -1 : 1;
   }
-  return a.id.localeCompare(b.id);
+
+  const aCounter = runCounter(a.id, a.created);
+  const bCounter = runCounter(b.id, b.created);
+  if (aCounter !== bCounter) {
+    return bCounter - aCounter;
+  }
+
+  return b.id.localeCompare(a.id);
+}
+
+function runCounter(id: string, created: string): number {
+  if (id === created) {
+    return 0;
+  }
+  const prefix = `${created}-`;
+  if (!id.startsWith(prefix)) {
+    return 0;
+  }
+  const suffix = id.slice(prefix.length);
+  if (!/^[0-9]+$/.test(suffix)) {
+    return 0;
+  }
+  return Number(suffix);
 }

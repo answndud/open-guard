@@ -49,6 +49,10 @@ export async function handleApi(
 
     if (url.pathname.startsWith("/api/runs/")) {
       const runId = url.pathname.replace("/api/runs/", "");
+      if (!isValidRunId(runId)) {
+        respondJson(res, 400, { error: "Invalid run id" });
+        return true;
+      }
       const report = await loadRunReport(dataDir, runId);
       respondJson(res, 200, report);
       return true;
@@ -56,6 +60,10 @@ export async function handleApi(
 
     if (url.pathname.startsWith("/api/policy/")) {
       const runId = url.pathname.replace("/api/policy/", "");
+      if (!isValidRunId(runId)) {
+        respondJson(res, 400, { error: "Invalid run id" });
+        return true;
+      }
       const policy = await loadRunPolicy(dataDir, runId);
       if (!policy) {
         respondJson(res, 404, { error: "Policy not found" });
@@ -71,9 +79,29 @@ export async function handleApi(
     return true;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    respondJson(res, 404, { error: message });
+    respondJson(res, statusForError(message), { error: message });
     return true;
   }
+}
+
+function isValidRunId(runId: string): boolean {
+  if (!runId) {
+    return false;
+  }
+  if (runId.includes("/")) {
+    return false;
+  }
+  return /^[A-Za-z0-9._:-]+$/.test(runId);
+}
+
+function statusForError(message: string): number {
+  if (message.startsWith("Run not found:")) {
+    return 404;
+  }
+  if (message === "No saved runs found.") {
+    return 404;
+  }
+  return 500;
 }
 
 function respondJson(
