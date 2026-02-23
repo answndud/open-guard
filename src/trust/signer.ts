@@ -5,7 +5,7 @@ import type { ProvenanceMetadata, Result, SignatureEnvelope } from "./types.js";
 import { hashArtifact } from "./artifact-hash.js";
 import { loadPrivateKey } from "./key-loader.js";
 
-const PAYLOAD_TYPE = "application/vnd.openguard.skill.v1";
+export const PAYLOAD_TYPE = "application/vnd.openguard.skill.v1";
 
 export interface SignInput {
   readonly artifactPath: string;

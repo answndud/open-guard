@@ -42,9 +42,9 @@ describe("trust signing", () => {
 
     const metadata = await createMetadata({
       version: "0.1.0",
-      commit: "test-commit",
+      commit: "1234567890abcdef1234567890abcdef12345678",
       builder: "openguard-cli/0.1.0",
-      timestamp: "2026-02-09T00:00:00Z",
+      timestamp: "2026-02-09T00:00:00.000Z",
     });
 
     const signed = await signArtifact({
@@ -193,5 +193,168 @@ describe("trust signing", () => {
       return;
     }
     expect(verified.error.message).toContain("expected 32 bytes");
+  });
+
+  it("rejects unsupported payload type", async () => {
+    const artifactPath = path.join(tempDir, "artifact.txt");
+    await fs.writeFile(artifactPath, "demo", "utf8");
+
+    const privateKey = Buffer.alloc(32, 4);
+    const publicKey = await getPublicKey(privateKey);
+    const privateKeyPath = path.join(tempDir, "private.key");
+    const publicKeyPath = path.join(tempDir, "public.key");
+    await fs.writeFile(
+      privateKeyPath,
+      Buffer.from(privateKey).toString("hex"),
+      "utf8",
+    );
+    await fs.writeFile(
+      publicKeyPath,
+      Buffer.from(publicKey).toString("hex"),
+      "utf8",
+    );
+
+    const metadata = await createMetadata({
+      version: "0.1.0",
+      commit: "1234567890abcdef1234567890abcdef12345678",
+      builder: "openguard-cli/0.1.0",
+      timestamp: "2026-02-09T00:00:00.000Z",
+    });
+
+    const signed = await signArtifact({
+      artifactPath,
+      privateKeyPath,
+      metadata,
+    });
+    expect(signed.ok).toBe(true);
+    if (!signed.ok) {
+      return;
+    }
+
+    const tampered = {
+      ...signed.value,
+      payload_type: "application/vnd.invalid.payload.v1",
+    };
+    const sigPath = path.join(tempDir, "artifact.sig.json");
+    await fs.writeFile(sigPath, JSON.stringify(tampered, null, 2), "utf8");
+
+    const verified = await verifyArtifact({
+      artifactPath,
+      signaturePath: sigPath,
+      publicKeyPath,
+    });
+    expect(verified.ok).toBe(false);
+    if (verified.ok) {
+      return;
+    }
+    expect(verified.error.message).toContain("Unsupported payload type");
+  });
+
+  it("fails strict verification for non-SHA commit metadata", async () => {
+    const artifactPath = path.join(tempDir, "artifact.txt");
+    await fs.writeFile(artifactPath, "demo", "utf8");
+
+    const privateKey = Buffer.alloc(32, 5);
+    const publicKey = await getPublicKey(privateKey);
+    const privateKeyPath = path.join(tempDir, "private.key");
+    const publicKeyPath = path.join(tempDir, "public.key");
+    await fs.writeFile(
+      privateKeyPath,
+      Buffer.from(privateKey).toString("hex"),
+      "utf8",
+    );
+    await fs.writeFile(
+      publicKeyPath,
+      Buffer.from(publicKey).toString("hex"),
+      "utf8",
+    );
+
+    const metadata = await createMetadata({
+      version: "0.1.0",
+      commit: "unknown",
+      builder: "openguard-cli/0.1.0",
+      timestamp: "2026-02-09T00:00:00.000Z",
+    });
+
+    const signed = await signArtifact({
+      artifactPath,
+      privateKeyPath,
+      metadata,
+    });
+    expect(signed.ok).toBe(true);
+    if (!signed.ok) {
+      return;
+    }
+
+    const sigPath = path.join(tempDir, "artifact.sig.json");
+    await writeSignature(sigPath, signed.value);
+
+    const verified = await verifyArtifact({
+      artifactPath,
+      signaturePath: sigPath,
+      publicKeyPath,
+      strict: true,
+    });
+    expect(verified.ok).toBe(false);
+    if (verified.ok) {
+      return;
+    }
+    expect(verified.error.message).toContain(
+      "commit must be a 7-40 character git SHA",
+    );
+  });
+
+  it("fails strict verification for non-canonical timestamp", async () => {
+    const artifactPath = path.join(tempDir, "artifact.txt");
+    await fs.writeFile(artifactPath, "demo", "utf8");
+
+    const privateKey = Buffer.alloc(32, 6);
+    const publicKey = await getPublicKey(privateKey);
+    const privateKeyPath = path.join(tempDir, "private.key");
+    const publicKeyPath = path.join(tempDir, "public.key");
+    await fs.writeFile(
+      privateKeyPath,
+      Buffer.from(privateKey).toString("hex"),
+      "utf8",
+    );
+    await fs.writeFile(
+      publicKeyPath,
+      Buffer.from(publicKey).toString("hex"),
+      "utf8",
+    );
+
+    const metadata = await createMetadata({
+      version: "0.1.0",
+      commit: "1234567890abcdef1234567890abcdef12345678",
+      builder: "openguard-cli/0.1.0",
+      timestamp: "2026-02-09T00:00:00Z",
+    });
+
+    const signed = await signArtifact({
+      artifactPath,
+      privateKeyPath,
+      metadata,
+    });
+    expect(signed.ok).toBe(true);
+    if (!signed.ok) {
+      return;
+    }
+
+    const sigPath = path.join(tempDir, "artifact.sig.json");
+    await writeSignature(sigPath, signed.value);
+
+    const verified = await verifyArtifact({
+      artifactPath,
+      signaturePath: sigPath,
+      publicKeyPath,
+      strict: true,
+    });
+    expect(verified.ok).toBe(false);
+    if (verified.ok) {
+      return;
+    }
+    expect(verified.error.message).toContain(
+      "timestamp must use canonical ISO-8601 UTC format",
+    );
   });
 });
