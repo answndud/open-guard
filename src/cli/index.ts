@@ -621,7 +621,7 @@ export function normalizeShow(value: string): "summary" | "findings" | "all" {
   return "all";
 }
 
-async function promptText(
+export async function promptText(
   rl: readline.Interface,
   label: string,
   fallback: string,
@@ -633,7 +633,7 @@ async function promptText(
   return trimmed.length > 0 ? trimmed : fallback;
 }
 
-async function promptYesNo(
+export async function promptYesNo(
   rl: readline.Interface,
   label: string,
   fallback: boolean,
@@ -647,7 +647,7 @@ async function promptYesNo(
   return trimmed === "y" || trimmed === "yes";
 }
 
-async function promptOptionalNumber(
+export async function promptOptionalNumber(
   rl: readline.Interface,
   label: string,
   fallback: string,
@@ -663,7 +663,7 @@ async function promptOptionalNumber(
   return Number.isFinite(value) ? value : null;
 }
 
-async function promptContinue(rl: readline.Interface): Promise<boolean> {
+export async function promptContinue(rl: readline.Interface): Promise<boolean> {
   const input = await rl.question("Return to menu? (Y/n): ");
   const trimmed = input.trim().toLowerCase();
   if (!trimmed) {

@@ -4,6 +4,10 @@ import {
   parseFormat,
   parseOptionalNumberOption,
   parseRequiredNumberOption,
+  promptContinue,
+  promptOptionalNumber,
+  promptText,
+  promptYesNo,
   shouldLaunchInteractive,
 } from "../../src/cli/index.js";
 
@@ -95,6 +99,37 @@ describe("cli entrypoint helpers", () => {
       restoreEnv("GITHUB_ACTIONS", prevActions);
     }
   });
+
+  it("prompts with fallback handling", async () => {
+    const rl = fakeRl(["", "  custom  "]);
+
+    await expect(promptText(rl, "Target", ".")).resolves.toBe(".");
+    await expect(promptText(rl, "Target", ".")).resolves.toBe("custom");
+  });
+
+  it("parses yes/no prompt answers", async () => {
+    const rl = fakeRl(["", "yes", "n"]);
+
+    await expect(promptYesNo(rl, "Continue", true)).resolves.toBe(true);
+    await expect(promptYesNo(rl, "Continue", false)).resolves.toBe(true);
+    await expect(promptYesNo(rl, "Continue", true)).resolves.toBe(false);
+  });
+
+  it("parses optional numbers and continue prompt", async () => {
+    const rl = fakeRl(["", "20", "abc", "", "n"]);
+
+    await expect(promptOptionalNumber(rl, "Max findings", "")).resolves.toBe(
+      null,
+    );
+    await expect(promptOptionalNumber(rl, "Max findings", "")).resolves.toBe(
+      20,
+    );
+    await expect(promptOptionalNumber(rl, "Max findings", "")).resolves.toBe(
+      null,
+    );
+    await expect(promptContinue(rl)).resolves.toBe(false);
+    await expect(promptContinue(rl)).resolves.toBe(true);
+  });
 });
 
 afterEach(() => {
@@ -129,4 +164,12 @@ function restoreEnv(name: "CI" | "GITHUB_ACTIONS", value: string | undefined) {
     return;
   }
   process.env[name] = value;
+}
+
+function fakeRl(answers: string[]) {
+  return {
+    async question(): Promise<string> {
+      return answers.shift() ?? "";
+    },
+  } as unknown as import("node:readline/promises").Interface;
 }
