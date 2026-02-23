@@ -181,7 +181,7 @@ async function loadVersion(): Promise<string> {
   return json.version ?? "0.0.0";
 }
 
-function parseFormat(value: string): "json" | "md" | "sarif" {
+export function parseFormat(value: string): "json" | "md" | "sarif" {
   if (value === "json" || value === "md" || value === "sarif") {
     return value;
   }
@@ -195,7 +195,7 @@ interface NumberOptionConfig {
   readonly integer?: boolean;
 }
 
-function parseOptionalNumberOption(
+export function parseOptionalNumberOption(
   value: unknown,
   config: NumberOptionConfig,
 ): number | undefined {
@@ -208,7 +208,7 @@ function parseOptionalNumberOption(
   return validateNumberOption(value, config);
 }
 
-function parseRequiredNumberOption(
+export function parseRequiredNumberOption(
   value: unknown,
   config: NumberOptionConfig,
 ): number {
@@ -218,7 +218,7 @@ function parseRequiredNumberOption(
   return validateNumberOption(value, config);
 }
 
-function validateNumberOption(
+export function validateNumberOption(
   value: string,
   config: NumberOptionConfig,
 ): number {
@@ -257,7 +257,7 @@ async function writeError(error: unknown): Promise<void> {
   });
 }
 
-function shouldLaunchInteractive(argv: string[]): boolean {
+export function shouldLaunchInteractive(argv: string[]): boolean {
   const args = argv.slice(2);
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
     return false;
@@ -614,7 +614,7 @@ function renderHelpText(): string {
   ].join("\n");
 }
 
-function normalizeShow(value: string): "summary" | "findings" | "all" {
+export function normalizeShow(value: string): "summary" | "findings" | "all" {
   if (value === "summary" || value === "findings" || value === "all") {
     return value;
   }
@@ -766,9 +766,11 @@ if (separatorIndex !== -1) {
   argv.splice(separatorIndex, 1);
 }
 
-if (shouldLaunchInteractive(argv)) {
-  await runInteractiveMenu(toolVersion);
-  process.exitCode = 0;
-} else {
-  await program.parseAsync(argv);
+if (process.env.VITEST !== "true") {
+  if (shouldLaunchInteractive(argv)) {
+    await runInteractiveMenu(toolVersion);
+    process.exitCode = 0;
+  } else {
+    await program.parseAsync(argv);
+  }
 }

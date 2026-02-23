@@ -9,39 +9,88 @@ import { renderPrComment } from "../src/report/pr-comment-renderer.js";
 import { postOrUpdateComment } from "./pr-commenter.js";
 import type { ScanReport } from "../src/report/types.js";
 
-async function run(): Promise<void> {
-  const token = process.env.GITHUB_TOKEN ?? core.getInput("github-token");
+interface ActionCore {
+  getInput(name: string): string;
+  setFailed(message: string): void;
+}
+
+interface ActionGithub {
+  readonly context: {
+    readonly payload: {
+      readonly pull_request?: {
+        readonly number: number;
+        readonly head?: { readonly sha?: string };
+        readonly base?: { readonly sha?: string };
+      };
+    };
+    readonly repo: { owner: string; repo: string };
+  };
+  getOctokit(token: string): Parameters<typeof postOrUpdateComment>[0];
+}
+
+interface GitClient {
+  checkout(ref: string): Promise<unknown>;
+}
+
+export interface RunActionDeps {
+  readonly core: ActionCore;
+  readonly github: ActionGithub;
+  readonly createGit: () => GitClient;
+  readonly runScan: typeof runScanCommand;
+  readonly renderComment: typeof renderPrComment;
+  readonly postComment: typeof postOrUpdateComment;
+  readonly loadVersion: () => Promise<string>;
+  readonly tokenFromEnv: () => string | undefined;
+}
+
+const DEFAULT_DEPS: RunActionDeps = {
+  core,
+  github,
+  createGit: () => simpleGit(),
+  runScan: runScanCommand,
+  renderComment: renderPrComment,
+  postComment: postOrUpdateComment,
+  loadVersion,
+  tokenFromEnv: () => process.env.GITHUB_TOKEN,
+};
+
+export async function runAction(
+  deps: RunActionDeps = DEFAULT_DEPS,
+): Promise<void> {
+  const token = deps.tokenFromEnv() ?? deps.core.getInput("github-token");
   if (!token) {
-    core.setFailed("Missing GITHUB_TOKEN");
+    deps.core.setFailed("Missing GITHUB_TOKEN");
     return;
   }
 
-  const failOnScore = Number(core.getInput("fail-on-score") || "80");
-  const commentEnabled = core.getInput("comment").toLowerCase() !== "false";
-  const diffOnly = core.getInput("diff-only").toLowerCase() !== "false";
-  const rulesDir = core.getInput("rules") || undefined;
-  const policyPath = core.getInput("policy") || undefined;
+  const failOnScore = Number(deps.core.getInput("fail-on-score") || "80");
+  const commentEnabled =
+    deps.core.getInput("comment").toLowerCase() !== "false";
+  const diffOnly = deps.core.getInput("diff-only").toLowerCase() !== "false";
+  const rulesDir = deps.core.getInput("rules") || undefined;
+  const policyPath = deps.core.getInput("policy") || undefined;
 
-  const payload = github.context.payload;
+  const payload = deps.github.context.payload;
   const pullRequest = payload.pull_request;
   if (!pullRequest) {
-    core.setFailed("This action must run on pull_request events");
+    deps.core.setFailed("This action must run on pull_request events");
     return;
   }
 
   const headSha = pullRequest.head?.sha;
   const baseSha = pullRequest.base?.sha;
   if (!headSha || !baseSha) {
-    core.setFailed("Missing head/base SHA in pull request context");
+    deps.core.setFailed("Missing head/base SHA in pull request context");
     return;
   }
 
-  const toolVersion = await loadVersion();
-  const git = simpleGit();
+  const toolVersion = await deps.loadVersion();
+  const git = deps.createGit();
   const headReport = await scanAtRef(git, headSha, {
     rulesDir,
     policyPath,
     toolVersion,
+    runScan: deps.runScan,
   });
 
   let baseReport: ScanReport | undefined;
@@ -50,40 +99,42 @@ async function run(): Promise<void> {
       rulesDir,
       policyPath,
       toolVersion,
+      runScan: deps.runScan,
     });
   }
 
   await git.checkout(headSha);
 
   if (commentEnabled) {
-    const octokit = github.getOctokit(token);
-    const body = renderPrComment({ head: headReport, base: baseReport });
-    await postOrUpdateComment(
+    const octokit = deps.github.getOctokit(token);
+    const body = deps.renderComment({ head: headReport, base: baseReport });
+    await deps.postComment(
       octokit,
-      github.context.repo,
+      deps.github.context.repo,
       pullRequest.number,
       body,
     );
   }
 
   if (headReport.summary.total_score >= failOnScore) {
-    core.setFailed(
+    deps.core.setFailed(
       `Risk score ${headReport.summary.total_score} >= ${failOnScore}`,
     );
   }
 }
 
 async function scanAtRef(
-  git: ReturnType<typeof simpleGit>,
+  git: GitClient,
   ref: string,
   options: {
     rulesDir?: string;
     policyPath?: string;
     toolVersion: string;
+    runScan: typeof runScanCommand;
   },
 ) {
   await git.checkout(ref);
-  const result = await runScanCommand(
+  const result = await options.runScan(
     {
       target: ".",
       format: "json",
@@ -103,4 +154,6 @@ async function loadVersion(): Promise<string> {
   return json.version ?? "0.0.0";
 }
 
-void run();
+if (process.env.VITEST !== "true") {
+  void runAction();
+}
