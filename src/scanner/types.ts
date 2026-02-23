@@ -36,6 +36,8 @@ export interface Rule {
 
 export interface Evidence {
   readonly path: string;
+  readonly context_start_line: number;
+  readonly context_end_line: number;
   readonly start_line: number;
   readonly end_line: number;
   readonly snippet: string;

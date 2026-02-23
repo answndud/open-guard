@@ -279,8 +279,10 @@ describe("scanner", () => {
     }
 
     expect(curlFinding.evidence.path).toBe("install.sh");
-    expect(curlFinding.evidence.start_line).toBe(1);
-    expect(curlFinding.evidence.end_line).toBe(4);
+    expect(curlFinding.evidence.start_line).toBe(3);
+    expect(curlFinding.evidence.end_line).toBe(3);
+    expect(curlFinding.evidence.context_start_line).toBe(1);
+    expect(curlFinding.evidence.context_end_line).toBe(4);
     expect(curlFinding.evidence.match).toContain("curl");
   });
 
@@ -409,6 +411,32 @@ describe("scanner", () => {
     expect(findings.some((finding) => finding.rule_id === "OG-GHA-004")).toBe(
       true,
     );
+  });
+
+  it("keeps distinct locations for repeated structured GHA matches", async () => {
+    const ghaRule = findRule("OG-GHA-002");
+    const file = await writeTestFile(
+      ".github/workflows/repeat.yml",
+      [
+        "name: Repeat",
+        "on: pull_request",
+        "jobs:",
+        "  first:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/checkout@main",
+        "  second:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/checkout@main",
+      ].join("\n"),
+    );
+
+    const findings = await scanFile(file, [ghaRule], meta);
+    expect(findings).toHaveLength(2);
+    expect(findings[0]?.evidence.start_line).toBe(7);
+    expect(findings[1]?.evidence.start_line).toBe(11);
+    expect(findings[0]?.id).not.toBe(findings[1]?.id);
   });
 
   it("does not apply MCP rules to generic json files", async () => {

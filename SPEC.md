@@ -219,7 +219,7 @@ Key fields:
 ### 6.4 Local Dashboard Data
 
 The dashboard reads stored scan outputs and policies from a local data directory (default `./.openguard/`).
-All data is file-based and offline-only. See `docs/DASHBOARD_PLAN.md`.
+All data is file-based and offline-only. See `PLAN.md` for current dashboard-related roadmap items.
 
 ## 7. CLI Interface
 

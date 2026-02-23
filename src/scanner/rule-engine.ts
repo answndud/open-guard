@@ -114,11 +114,14 @@ function scanGhaRuleStructured(
 
   const matches = findGhaMatches(rule.id, parsed);
   const findings: Finding[] = [];
+  const nextSearchIndex = new Map<string, number>();
   for (const matchedText of matches) {
-    const index = content.indexOf(matchedText);
+    const searchFrom = nextSearchIndex.get(matchedText) ?? 0;
+    const index = content.indexOf(matchedText, searchFrom);
     if (index < 0) {
       continue;
     }
+    nextSearchIndex.set(matchedText, index + matchedText.length);
     const evidence = extractEvidence(relativePath, content, index, matchedText);
     findings.push(createFinding(rule, evidence));
   }

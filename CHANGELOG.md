@@ -29,8 +29,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   - docs/RULES_CATALOG.md — Initial rule catalog (35+ rules)
   - AI_GUIDE.md — Development guide for AI coding agents
   - CONTRIBUTING.md — Contribution guidelines
-  - docs/TEST_PLAN.md — Testing strategy and test matrix
-  - docs/ROADMAP.md — Development roadmap through v2.0
+  - PLAN.md — Active development roadmap and test-quality targets
+  - PROGRESS.md — Execution history and unresolved issue tracking
   - docs/VERSIONING.md — Versioning policy
   - docs/SECURITY.md — Security policy and disclosure
 - JSON schemas for findings, policies, and reports
@@ -58,7 +58,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - MCP rules are constrained to MCP manifest-style config paths to reduce noise in generic JSON/YAML files
 - GHA injection detection now includes risky expressions passed through reusable workflow `with:` inputs
 - PR comment output now includes a "New High-Signal Rules" section summarizing critical/high-confidence new rule hits
+- Planning and execution tracking docs are consolidated at repo root (`PLAN.md`, `PROGRESS.md`)
 
 ### Fixed
 
-- `docs/ROADMAP.md` now marks SARIF export as delivered in v0.2
+- roadmap history now reflects SARIF export as delivered in v0.2

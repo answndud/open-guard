@@ -3,6 +3,15 @@
 This file is for agentic coding tools operating in this repo.
 Follow the rules in this file, plus `AI_GUIDE.md`, `ARCHITECTURE.md`, and `SPEC.md`.
 
+## Planning and Progress Files
+
+- Before starting implementation, read `PLAN.md` and `PROGRESS.md` at the repo root.
+- `PLAN.md` is the source of truth for upcoming work and priority order.
+- `PROGRESS.md` is the source of truth for execution history: completed work, failures, and unresolved issues.
+- When you add or change development plans, update `PLAN.md` in the same session.
+- While executing work, record key outcomes in `PROGRESS.md` (what was completed, errors seen, what remains unresolved).
+- If older docs conflict with active work tracking, follow `PLAN.md` and `PROGRESS.md` for current task sequencing.
+
 ## Quick Commands
 
 All commands use `pnpm`.

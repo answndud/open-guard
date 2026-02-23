@@ -10,14 +10,16 @@ export function extractEvidence(
 ): Evidence {
   const lines = source.split(/\r?\n/);
   const matchLine = indexToLine(lines, matchIndex);
-  const startLine = Math.max(1, matchLine - CONTEXT_LINES);
-  const endLine = Math.min(lines.length, matchLine + CONTEXT_LINES);
-  const snippet = lines.slice(startLine - 1, endLine).join("\n");
+  const contextStartLine = Math.max(1, matchLine - CONTEXT_LINES);
+  const contextEndLine = Math.min(lines.length, matchLine + CONTEXT_LINES);
+  const snippet = lines.slice(contextStartLine - 1, contextEndLine).join("\n");
 
   return {
     path: filePath,
-    start_line: startLine,
-    end_line: endLine,
+    context_start_line: contextStartLine,
+    context_end_line: contextEndLine,
+    start_line: matchLine,
+    end_line: matchLine,
     snippet,
     match: matchText,
   };

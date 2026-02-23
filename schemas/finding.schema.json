@@ -4,13 +4,22 @@
   "title": "Finding",
   "description": "A single security finding detected by OpenGuard scanner",
   "type": "object",
-  "required": ["id", "rule_id", "severity", "category", "confidence", "title", "description", "evidence"],
+  "required": [
+    "id",
+    "rule_id",
+    "severity",
+    "category",
+    "confidence",
+    "title",
+    "description",
+    "evidence"
+  ],
   "properties": {
     "id": {
       "type": "string",
       "minLength": 8,
       "maxLength": 16,
-      "description": "Stable finding identifier: sha256(rule_id + path + start_line + match).slice(0, 12)"
+      "description": "Stable finding identifier: sha256(rule_id + path + matched_line + match).slice(0, 12)"
     },
     "rule_id": {
       "type": "string",
@@ -58,21 +67,38 @@
     },
     "evidence": {
       "type": "object",
-      "required": ["path", "start_line", "end_line", "snippet"],
+      "required": [
+        "path",
+        "context_start_line",
+        "context_end_line",
+        "start_line",
+        "end_line",
+        "snippet"
+      ],
       "properties": {
         "path": {
           "type": "string",
           "description": "Relative file path from scan target root"
         },
+        "context_start_line": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Context snippet start line (1-indexed)"
+        },
+        "context_end_line": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Context snippet end line (1-indexed, inclusive)"
+        },
         "start_line": {
           "type": "integer",
           "minimum": 1,
-          "description": "Starting line number (1-indexed)"
+          "description": "Matched line number (1-indexed)"
         },
         "end_line": {
           "type": "integer",
           "minimum": 1,
-          "description": "Ending line number (1-indexed, inclusive)"
+          "description": "Matched end line number (1-indexed, inclusive)"
         },
         "snippet": {
           "type": "string",

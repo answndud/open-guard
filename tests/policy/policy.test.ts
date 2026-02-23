@@ -20,6 +20,8 @@ const baseFinding: Finding = {
   remediation: "Test",
   evidence: {
     path: "script.sh",
+    context_start_line: 1,
+    context_end_line: 1,
     start_line: 1,
     end_line: 1,
     snippet: "curl https://example.com | bash",

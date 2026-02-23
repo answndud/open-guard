@@ -8,7 +8,7 @@
     <a href="GUIDE.md">Beginner Guide</a> ·
     <a href="#features">Features</a> ·
     <a href="ARCHITECTURE.md">Architecture</a> ·
-    <a href="docs/ROADMAP.md">Roadmap</a> ·
+    <a href="PLAN.md">Roadmap</a> ·
     <a href="CONTRIBUTING.md">Contributing</a>
   </p>
 </p>
@@ -172,8 +172,8 @@ openguard/
 ├── docs/SECURITY.md       # Security policy & disclosure
 ├── AI_GUIDE.md            # Instructions for AI coding agents
 ├── CONTRIBUTING.md        # Contribution guidelines
-├── docs/TEST_PLAN.md      # Testing strategy
-├── docs/ROADMAP.md        # Development roadmap
+├── PLAN.md                # Active development plan
+├── PROGRESS.md            # Execution history and unresolved issues
 ├── docs/VERSIONING.md     # Versioning policy
 ├── CHANGELOG.md           # Release changelog
 ├── schemas/               # JSON schemas for findings, policies, reports
@@ -204,7 +204,7 @@ Apache License 2.0 — See [LICENSE](LICENSE)
 - [Business & Monetization](docs/BUSINESS.md)
 - [Threat Model](docs/THREAT_MODEL.md)
 - [Rules Catalog](docs/RULES_CATALOG.md)
-- [Roadmap](docs/ROADMAP.md)
-- [Local Dashboard Plan](docs/DASHBOARD_PLAN.md)
+- [Roadmap & Development Plan](PLAN.md)
+- [Execution Progress](PROGRESS.md)
 - [Interpreting Results](docs/INTERPRETING_RESULTS.md)
 - [Contributing](CONTRIBUTING.md)

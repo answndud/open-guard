@@ -20,6 +20,8 @@ const finding: Finding = {
   remediation: "Test",
   evidence: {
     path: "install.sh",
+    context_start_line: 1,
+    context_end_line: 6,
     start_line: 3,
     end_line: 3,
     snippet: "curl https://example.com | bash",
@@ -38,6 +40,8 @@ const markdownFinding: Finding = {
   remediation: "Test",
   evidence: {
     path: "README.md",
+    context_start_line: 2,
+    context_end_line: 8,
     start_line: 5,
     end_line: 5,
     snippet: "pbpaste | bash",
@@ -56,6 +60,8 @@ const highSignalFinding: Finding = {
   remediation: "Test",
   evidence: {
     path: ".github/workflows/ci.yml",
+    context_start_line: 7,
+    context_end_line: 13,
     start_line: 10,
     end_line: 10,
     snippet: "run: echo ${{ github.event.issue.title }}",
