@@ -29,6 +29,8 @@ tmp/
 
 # Local data
 .openguard/
+PLAN.md
+PROGRESS.md
 
 # Logs
 *.log
