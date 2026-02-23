@@ -116,4 +116,82 @@ describe("trust signing", () => {
     });
     expect(verified.ok).toBe(false);
   });
+
+  it("rejects malformed private key input", async () => {
+    const artifactPath = path.join(tempDir, "artifact.txt");
+    await fs.writeFile(artifactPath, "demo", "utf8");
+
+    const privateKeyPath = path.join(tempDir, "private.key");
+    await fs.writeFile(privateKeyPath, "not-a-valid-key@@", "utf8");
+
+    const metadata = await createMetadata({
+      version: "0.1.0",
+      commit: "test-commit",
+      builder: "openguard-cli/0.1.0",
+      timestamp: "2026-02-09T00:00:00Z",
+    });
+
+    const signed = await signArtifact({
+      artifactPath,
+      privateKeyPath,
+      metadata,
+    });
+
+    expect(signed.ok).toBe(false);
+    if (signed.ok) {
+      return;
+    }
+    expect(signed.error.message).toContain("hex or base64");
+  });
+
+  it("rejects public key with wrong length", async () => {
+    const artifactPath = path.join(tempDir, "artifact.txt");
+    await fs.writeFile(artifactPath, "demo", "utf8");
+
+    const privateKey = Buffer.alloc(32, 3);
+    const publicKey = await getPublicKey(privateKey);
+    const privateKeyPath = path.join(tempDir, "private.key");
+    const badPublicKeyPath = path.join(tempDir, "public.key");
+    await fs.writeFile(
+      privateKeyPath,
+      Buffer.from(privateKey).toString("hex"),
+      "utf8",
+    );
+    await fs.writeFile(
+      badPublicKeyPath,
+      Buffer.from(publicKey).subarray(0, 31).toString("hex"),
+      "utf8",
+    );
+
+    const metadata = await createMetadata({
+      version: "0.1.0",
+      commit: "test-commit",
+      builder: "openguard-cli/0.1.0",
+      timestamp: "2026-02-09T00:00:00Z",
+    });
+
+    const signed = await signArtifact({
+      artifactPath,
+      privateKeyPath,
+      metadata,
+    });
+    expect(signed.ok).toBe(true);
+    if (!signed.ok) {
+      return;
+    }
+
+    const sigPath = path.join(tempDir, "artifact.sig.json");
+    await writeSignature(sigPath, signed.value);
+
+    const verified = await verifyArtifact({
+      artifactPath,
+      signaturePath: sigPath,
+      publicKeyPath: badPublicKeyPath,
+    });
+    expect(verified.ok).toBe(false);
+    if (verified.ok) {
+      return;
+    }
+    expect(verified.error.message).toContain("expected 32 bytes");
+  });
 });

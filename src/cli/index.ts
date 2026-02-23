@@ -36,6 +36,16 @@ program
   .option("--show-evidence", "Include evidence snippets")
   .action(async (target: string, options) => {
     try {
+      const threshold = parseOptionalNumberOption(options.threshold, {
+        name: "threshold",
+        min: 0,
+        max: 100,
+      });
+      const maxFindings = parseOptionalNumberOption(options.maxFindings, {
+        name: "max-findings",
+        min: 1,
+        integer: true,
+      });
       const result = await runScanCommand(
         {
           target,
@@ -44,13 +54,11 @@ program
           diffBase: options.diffBase,
           rulesDir: options.rules,
           policyPath: options.policy,
-          threshold: options.threshold ? Number(options.threshold) : undefined,
+          threshold,
           saveRun: Boolean(options.saveRun),
           dataDir: options.dataDir,
           show: options.show,
-          maxFindings: options.maxFindings
-            ? Number(options.maxFindings)
-            : undefined,
+          maxFindings,
           showEvidence: Boolean(options.showEvidence),
         },
         toolVersion,
@@ -61,8 +69,8 @@ program
       }
 
       if (
-        typeof options.threshold === "string" &&
-        result.report.summary.total_score >= Number(options.threshold)
+        typeof threshold === "number" &&
+        result.report.summary.total_score >= threshold
       ) {
         process.exitCode = 2;
       }
@@ -107,8 +115,14 @@ program
   .option("--data-dir <path>", "Dashboard data directory")
   .action(async (options) => {
     try {
+      const port = parseRequiredNumberOption(options.port, {
+        name: "port",
+        min: 1,
+        max: 65535,
+        integer: true,
+      });
       const result = await runServerCommand({
-        port: Number(options.port),
+        port,
         dataDir: options.dataDir,
       });
       await writeStdout(
@@ -172,6 +186,56 @@ function parseFormat(value: string): "json" | "md" | "sarif" {
     return value;
   }
   throw new Error(`Unsupported format: ${value}`);
+}
+
+interface NumberOptionConfig {
+  readonly name: string;
+  readonly min?: number;
+  readonly max?: number;
+  readonly integer?: boolean;
+}
+
+function parseOptionalNumberOption(
+  value: unknown,
+  config: NumberOptionConfig,
+): number | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (typeof value !== "string") {
+    throw new Error(`Invalid --${config.name}: expected numeric value`);
+  }
+  return validateNumberOption(value, config);
+}
+
+function parseRequiredNumberOption(
+  value: unknown,
+  config: NumberOptionConfig,
+): number {
+  if (typeof value !== "string") {
+    throw new Error(`Invalid --${config.name}: expected numeric value`);
+  }
+  return validateNumberOption(value, config);
+}
+
+function validateNumberOption(
+  value: string,
+  config: NumberOptionConfig,
+): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    throw new Error(`Invalid --${config.name}: '${value}' is not a number`);
+  }
+  if (config.integer && !Number.isInteger(parsed)) {
+    throw new Error(`Invalid --${config.name}: '${value}' must be an integer`);
+  }
+  if (config.min !== undefined && parsed < config.min) {
+    throw new Error(`Invalid --${config.name}: must be >= ${config.min}`);
+  }
+  if (config.max !== undefined && parsed > config.max) {
+    throw new Error(`Invalid --${config.name}: must be <= ${config.max}`);
+  }
+  return parsed;
 }
 
 async function writeStdout(message: string): Promise<void> {
