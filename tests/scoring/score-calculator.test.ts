@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { calculateScore } from "../../src/scoring/score-calculator.js";
+import {
+  countFindingsForScoreCategory,
+  scoreCategoryForFinding,
+} from "../../src/scoring/score-category.js";
 import { Confidence, Severity } from "../../src/scanner/types.js";
 import type { Finding } from "../../src/scanner/types.js";
 
@@ -118,5 +122,35 @@ describe("score calculator", () => {
     const result = calculateScore([finding]);
     expect(result.subscores.credentials).toBe(15);
     expect(result.subscores.shell).toBe(0);
+  });
+
+  it("uses the shared GHA score-category mapping helpers", () => {
+    const permissionsFinding: Finding = {
+      ...baseFinding,
+      id: "gha-permissions",
+      rule_id: "OG-GHA-001",
+      category: "gha",
+    };
+    const runFinding: Finding = {
+      ...baseFinding,
+      id: "gha-run",
+      rule_id: "OG-GHA-004",
+      category: "gha",
+    };
+
+    expect(scoreCategoryForFinding(permissionsFinding)).toBe("credentials");
+    expect(scoreCategoryForFinding(runFinding)).toBe("shell");
+    expect(
+      countFindingsForScoreCategory(
+        [permissionsFinding, runFinding],
+        "credentials",
+      ),
+    ).toBe(1);
+    expect(
+      countFindingsForScoreCategory(
+        [permissionsFinding, runFinding],
+        "shell",
+      ),
+    ).toBe(1);
   });
 });

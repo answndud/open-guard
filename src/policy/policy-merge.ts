@@ -37,15 +37,20 @@ export function mergePolicy(base: Policy, generated: Policy): Policy {
   const deny = mergeDeny(base.deny, generated.deny);
   const approvals = mergeApprovals(base.approvals, generated.approvals);
 
-  const normalizedAllow = removeDeniedAllows(allow, deny);
-
-  return {
+  return normalizePolicy({
     version: "v1",
     metadata,
     defaults,
-    allow: normalizedAllow,
+    allow,
     deny,
     approvals,
+  });
+}
+
+export function normalizePolicy(policy: Policy): Policy {
+  return {
+    ...policy,
+    allow: removeDeniedAllows(policy.allow, policy.deny),
   };
 }
 

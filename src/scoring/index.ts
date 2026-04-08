@@ -1,4 +1,8 @@
 export { calculateScore } from "./score-calculator.js";
+export {
+  countFindingsForScoreCategory,
+  scoreCategoryForFinding,
+} from "./score-category.js";
 export type { ScoreResult, Subscores } from "./types.js";
 export {
   CATEGORY_MAP,

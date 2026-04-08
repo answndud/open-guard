@@ -47,12 +47,15 @@ describe("policy generator", () => {
   it("includes safe lists", () => {
     const policy = generatePolicy([], repoContext);
     expect(policy.allow.commands.length).toBe(SAFE_COMMANDS.length);
-    expect(policy.allow.network.domains).toEqual(SAFE_DOMAINS);
+    expect(policy.allow.network.domains).toEqual(
+      [...SAFE_DOMAINS].sort((a, b) => a.localeCompare(b)),
+    );
   });
 
   it("adds denied commands from high severity shell findings", () => {
     const policy = generatePolicy([baseFinding], repoContext);
     expect(policy.deny.commands.some((cmd) => cmd.cmd === "curl")).toBe(true);
+    expect(policy.allow.commands.some((cmd) => cmd.cmd === "curl")).toBe(false);
   });
 });
 

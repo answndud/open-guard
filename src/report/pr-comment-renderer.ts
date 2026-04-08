@@ -2,6 +2,7 @@ import type { ScanReport } from "./types.js";
 import type { Finding } from "../scanner/types.js";
 import type { Policy, CommandRule } from "../policy/types.js";
 import { riskLevelForScore } from "./report-utils.js";
+import { countFindingsForScoreCategory } from "../scoring/index.js";
 
 const COMMENT_MARKER = "<!-- openguard-pr-comment -->";
 
@@ -34,28 +35,27 @@ export function renderPrComment(input: PrCommentInput): string {
   lines.push("| Category | Score | Findings |");
   lines.push("| --- | --- | --- |");
   lines.push(
-    `| Shell | ${head.summary.subscores.shell} | ${countCategories(head, [
+    `| Shell | ${head.summary.subscores.shell} | ${countFindingsForScoreCategory(
+      head.findings,
       "shell",
-      "obfuscation",
-      "gha",
-    ])} |`,
-  );
-  lines.push(
-    `| Network | ${head.summary.subscores.network} | ${countCategories(head, [
-      "network",
-      "supply-chain",
-    ])} |`,
-  );
-  lines.push(
-    `| Filesystem | ${head.summary.subscores.filesystem} | ${countCategories(
-      head,
-      ["filesystem", "macos", "windows"],
     )} |`,
   );
   lines.push(
-    `| Credentials | ${head.summary.subscores.credentials} | ${countCategories(
-      head,
-      ["credentials"],
+    `| Network | ${head.summary.subscores.network} | ${countFindingsForScoreCategory(
+      head.findings,
+      "network",
+    )} |`,
+  );
+  lines.push(
+    `| Filesystem | ${head.summary.subscores.filesystem} | ${countFindingsForScoreCategory(
+      head.findings,
+      "filesystem",
+    )} |`,
+  );
+  lines.push(
+    `| Credentials | ${head.summary.subscores.credentials} | ${countFindingsForScoreCategory(
+      head.findings,
+      "credentials",
     )} |`,
   );
 
@@ -124,15 +124,6 @@ function diffFindings(
 ): Finding[] {
   const baseIds = new Set(base.map((finding) => finding.id));
   return head.filter((finding) => !baseIds.has(finding.id));
-}
-
-function countCategories(
-  report: ScanReport,
-  categories: readonly string[],
-): number {
-  return report.findings.filter((finding) =>
-    categories.includes(finding.category),
-  ).length;
 }
 
 function formatSeverity(severity: string): string {

@@ -7,9 +7,11 @@ import {
   attachPolicyToLatest,
   listRuns,
   loadLatestSummary,
+  loadDashboardState,
   loadRunPolicy,
   loadRunReport,
   resolveDataDir,
+  updateRunMetadata,
   writeRun,
 } from "../../src/server/store.js";
 
@@ -89,5 +91,29 @@ describe("run store", () => {
     const latest = await loadLatestSummary(dataDir);
     expect(latest.entry.id).toBe(second.id);
     expect(latest.report.summary.total_score).toBe(22);
+  });
+
+  it("persists dashboard metadata on saved runs", async () => {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "openguard-"));
+    const dataDir = resolveDataDir(tempDir);
+
+    const run = await writeRun(dataDir, makeReport(7), undefined, {
+      now: new Date("2026-02-09T18:05:00Z"),
+    });
+
+    const updated = await updateRunMetadata(dataDir, run.id, {
+      target_id: "target-123",
+      target_label: "/tmp/repo",
+      action: "policy-generate",
+      source_job_id: "job-456",
+    });
+    expect(updated.target_id).toBe("target-123");
+    expect(updated.target_label).toBe("/tmp/repo");
+    expect(updated.action).toBe("policy-generate");
+    expect(updated.source_job_id).toBe("job-456");
+
+    const dashboard = await loadDashboardState(dataDir);
+    expect(dashboard.runs[0]?.target_id).toBe("target-123");
+    expect(dashboard.summary.total_runs).toBe(1);
   });
 });

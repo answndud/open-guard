@@ -1,3 +1,4 @@
+import { countFindingsForScoreCategory } from "../scoring/index.js";
 import type { ScanReport } from "./types.js";
 
 export interface MarkdownRenderOptions {
@@ -27,22 +28,22 @@ export function renderMarkdownReport(
           [
             "Shell",
             String(report.summary.subscores.shell),
-            String(countFindings(report, ["shell", "obfuscation", "gha"])),
+            String(countFindingsForScoreCategory(report.findings, "shell")),
           ],
           [
             "Network",
             String(report.summary.subscores.network),
-            String(countFindings(report, ["network", "supply-chain"])),
+            String(countFindingsForScoreCategory(report.findings, "network")),
           ],
           [
             "Filesystem",
             String(report.summary.subscores.filesystem),
-            String(countFindings(report, ["filesystem", "macos", "windows"])),
+            String(countFindingsForScoreCategory(report.findings, "filesystem")),
           ],
           [
             "Credentials",
             String(report.summary.subscores.credentials),
-            String(countFindings(report, ["credentials"])),
+            String(countFindingsForScoreCategory(report.findings, "credentials")),
           ],
         ],
         ["Category", "Score", "Findings"],
@@ -155,15 +156,6 @@ function renderAsciiTable(
         .join(" | ")} |`,
   );
   return [border, headerLine, border, ...body, border].join("\n");
-}
-
-function countFindings(
-  report: ScanReport,
-  categories: readonly string[],
-): number {
-  return report.findings.filter((finding) =>
-    categories.includes(finding.category),
-  ).length;
 }
 
 function formatRiskLevel(level: string): string {

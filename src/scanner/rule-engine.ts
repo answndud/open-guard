@@ -331,6 +331,10 @@ function ruleAppliesToFile(
   file: FileEntry,
   meta: RuleMeta,
 ): boolean {
+  if (shouldSuppressRuleForPath(rule, file.relativePath)) {
+    return false;
+  }
+
   const fileTypes = resolveFileTypes(file, meta);
   for (const type of rule.scope.file_types) {
     if (fileTypes.has(type)) {
@@ -338,6 +342,44 @@ function ruleAppliesToFile(
     }
   }
   return false;
+}
+
+function shouldSuppressRuleForPath(rule: Rule, relativePath: string): boolean {
+  const normalizedPath = relativePath.split(path.sep).join(path.posix.sep);
+
+  if (isDocumentationPath(normalizedPath)) {
+    return !isDocumentationFocusedRule(rule);
+  }
+
+  return isExampleOrTestPath(normalizedPath);
+}
+
+function isDocumentationPath(relativePath: string): boolean {
+  const basename = path.posix.basename(relativePath).toLowerCase();
+  if (basename === "readme.md" || basename === "guide.md") {
+    return true;
+  }
+  return relativePath.startsWith("docs/");
+}
+
+function isExampleOrTestPath(relativePath: string): boolean {
+  if (relativePath.startsWith("examples/")) {
+    return true;
+  }
+  if (relativePath.startsWith("fixtures/")) {
+    return true;
+  }
+  if (relativePath.startsWith("tests/")) {
+    return true;
+  }
+  if (relativePath.includes("/__tests__/")) {
+    return true;
+  }
+  return /\.(test|spec)\.[^/]+$/i.test(relativePath);
+}
+
+function isDocumentationFocusedRule(rule: Rule): boolean {
+  return rule.id.startsWith("OG-MD-") || rule.id.startsWith("OG-SC-");
 }
 
 function resolveFileTypes(file: FileEntry, meta: RuleMeta): Set<string> {

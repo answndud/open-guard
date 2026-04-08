@@ -5,6 +5,7 @@ import {
   SAFE_COMMANDS,
   SAFE_DOMAINS,
 } from "./safe-lists.js";
+import { normalizePolicy } from "./policy-merge.js";
 import { ApprovalCategory, ApprovalMode } from "./types.js";
 import type { Approvals, Policy, PolicyDefaults } from "./types.js";
 
@@ -62,14 +63,14 @@ export function generatePolicy(
     deny.commands = findDeniedCommands(findings);
   }
 
-  return {
+  return normalizePolicy({
     version: "v1",
     metadata,
     defaults,
     allow,
     deny,
     approvals,
-  };
+  });
 }
 
 function findDeniedCommands(findings: readonly Finding[]) {

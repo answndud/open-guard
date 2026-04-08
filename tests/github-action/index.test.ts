@@ -16,6 +16,23 @@ describe("github action entrypoint", () => {
     expect(failed).toEqual(["Missing GITHUB_TOKEN"]);
   });
 
+  it("accepts token from action input when env token is absent", async () => {
+    const comments: string[] = [];
+    await runAction(
+      makeDeps({
+        token: undefined,
+        inputs: {
+          "github-token": "input-token",
+          comment: "true",
+          "diff-only": "false",
+        },
+        onComment: (body) => comments.push(body),
+      }),
+    );
+
+    expect(comments).toEqual(["rendered comment"]);
+  });
+
   it("fails when event is not pull_request", async () => {
     const failed: string[] = [];
     await runAction(

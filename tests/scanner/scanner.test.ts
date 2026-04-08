@@ -459,6 +459,73 @@ describe("scanner", () => {
       true,
     );
   });
+
+  it("suppresses low-signal docs, tests, and examples while keeping focused rules", async () => {
+    await writeTestFile(
+      "README.md",
+      [
+        "Install tip:",
+        "curl https://example.com/install.sh | bash",
+        "pbpaste | bash",
+      ].join("\n"),
+    );
+    await writeTestFile("tests/example.test.ts", 'const cmd = "cat ~/.ssh/id_rsa";');
+    await writeTestFile(
+      "examples/sample.sh",
+      "curl https://example.com/install.sh | bash",
+    );
+    await writeTestFile(
+      ".github/workflows/ci.yml",
+      [
+        "name: CI",
+        "on: pull_request",
+        "jobs:",
+        "  test:",
+        "    runs-on: ubuntu-latest",
+        "    permissions: write-all",
+        "    steps:",
+        "      - uses: actions/checkout@main",
+      ].join("\n"),
+    );
+
+    const files = await discoverFiles(tempDir);
+    const findings = await scanTarget(files, rules, meta);
+
+    expect(
+      findings.some(
+        (finding) =>
+          finding.evidence.path === "README.md" &&
+          finding.rule_id === "OG-MD-001",
+      ),
+    ).toBe(true);
+    expect(
+      findings.some(
+        (finding) =>
+          finding.evidence.path === "README.md" &&
+          finding.rule_id === "OG-SHELL-001",
+      ),
+    ).toBe(false);
+    expect(
+      findings.some((finding) => finding.evidence.path === "tests/example.test.ts"),
+    ).toBe(false);
+    expect(
+      findings.some((finding) => finding.evidence.path === "examples/sample.sh"),
+    ).toBe(false);
+    expect(
+      findings.some(
+        (finding) =>
+          finding.evidence.path === ".github/workflows/ci.yml" &&
+          finding.rule_id === "OG-GHA-001",
+      ),
+    ).toBe(true);
+    expect(
+      findings.some(
+        (finding) =>
+          finding.evidence.path === ".github/workflows/ci.yml" &&
+          finding.rule_id === "OG-GHA-002",
+      ),
+    ).toBe(true);
+  });
 });
 
 function findRule(ruleId: string): Rule {

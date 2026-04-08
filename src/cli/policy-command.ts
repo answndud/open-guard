@@ -12,6 +12,7 @@ import { validatePolicy } from "../policy/policy-validator.js";
 import { buildJsonReport } from "../report/json-reporter.js";
 import { resolveDataDir, writeRun } from "../server/store.js";
 import { resolveRulesDirectory } from "./runtime-paths.js";
+import type { RunWriteOptions } from "../server/store.js";
 
 export interface PolicyGenerateOptions {
   readonly target: string;
@@ -25,6 +26,7 @@ export interface PolicyGenerateOptions {
 
 export async function runPolicyGenerate(
   options: PolicyGenerateOptions,
+  runWriteOptions: RunWriteOptions = {},
 ): Promise<string> {
   const rulesDir = await resolveRulesDirectory();
   const repoContext = await loadTarget(options.target);
@@ -64,7 +66,7 @@ export async function runPolicyGenerate(
       },
     });
     const dataDir = resolveDataDir(options.dataDir);
-    await writeRun(dataDir, report, output);
+    await writeRun(dataDir, report, output, runWriteOptions);
     await ensureRunPersisted(dataDir);
   }
 

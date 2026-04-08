@@ -144,6 +144,144 @@ describe("trust signing", () => {
     expect(signed.error.message).toContain("hex or base64");
   });
 
+  it("accepts base64-encoded keys", async () => {
+    const artifactPath = path.join(tempDir, "artifact.txt");
+    await fs.writeFile(artifactPath, "demo", "utf8");
+
+    const privateKey = Buffer.alloc(32, 7);
+    const publicKey = await getPublicKey(privateKey);
+    const privateKeyPath = path.join(tempDir, "private.key");
+    const publicKeyPath = path.join(tempDir, "public.key");
+    await fs.writeFile(privateKeyPath, Buffer.from(privateKey).toString("base64"));
+    await fs.writeFile(publicKeyPath, Buffer.from(publicKey).toString("base64"));
+
+    const metadata = await createMetadata({
+      version: "0.1.0",
+      commit: "1234567890abcdef1234567890abcdef12345678",
+      builder: "openguard-cli/0.1.0",
+      timestamp: "2026-02-09T00:00:00.000Z",
+    });
+
+    const signed = await signArtifact({
+      artifactPath,
+      privateKeyPath,
+      metadata,
+    });
+    expect(signed.ok).toBe(true);
+    if (!signed.ok) {
+      return;
+    }
+
+    const sigPath = path.join(tempDir, "artifact.sig.json");
+    await writeSignature(sigPath, signed.value);
+
+    const verified = await verifyArtifact({
+      artifactPath,
+      signaturePath: sigPath,
+      publicKeyPath,
+    });
+    expect(verified.ok).toBe(true);
+  });
+
+  it("rejects empty private key input", async () => {
+    const artifactPath = path.join(tempDir, "artifact.txt");
+    await fs.writeFile(artifactPath, "demo", "utf8");
+
+    const privateKeyPath = path.join(tempDir, "private.key");
+    await fs.writeFile(privateKeyPath, "   \n", "utf8");
+
+    const metadata = await createMetadata({
+      version: "0.1.0",
+      commit: "1234567890abcdef1234567890abcdef12345678",
+      builder: "openguard-cli/0.1.0",
+      timestamp: "2026-02-09T00:00:00.000Z",
+    });
+
+    const signed = await signArtifact({
+      artifactPath,
+      privateKeyPath,
+      metadata,
+    });
+    expect(signed.ok).toBe(false);
+    if (signed.ok) {
+      return;
+    }
+    expect(signed.error.message).toContain("Key file is empty");
+  });
+
+  it("supports base64-encoded key material", async () => {
+    const artifactPath = path.join(tempDir, "artifact.txt");
+    await fs.writeFile(artifactPath, "demo", "utf8");
+
+    const privateKey = Buffer.alloc(32, 7);
+    const publicKey = await getPublicKey(privateKey);
+    const privateKeyPath = path.join(tempDir, "private-base64.key");
+    const publicKeyPath = path.join(tempDir, "public-base64.key");
+    await fs.writeFile(
+      privateKeyPath,
+      Buffer.from(privateKey).toString("base64"),
+      "utf8",
+    );
+    await fs.writeFile(
+      publicKeyPath,
+      Buffer.from(publicKey).toString("base64"),
+      "utf8",
+    );
+
+    const metadata = await createMetadata({
+      version: "0.1.0",
+      commit: "1234567890abcdef1234567890abcdef12345678",
+      builder: "openguard-cli/0.1.0",
+      timestamp: "2026-02-09T00:00:00.000Z",
+    });
+
+    const signed = await signArtifact({
+      artifactPath,
+      privateKeyPath,
+      metadata,
+    });
+    expect(signed.ok).toBe(true);
+    if (!signed.ok) {
+      return;
+    }
+
+    const sigPath = path.join(tempDir, "artifact.sig.json");
+    await writeSignature(sigPath, signed.value);
+
+    const verified = await verifyArtifact({
+      artifactPath,
+      signaturePath: sigPath,
+      publicKeyPath,
+    });
+    expect(verified.ok).toBe(true);
+  });
+
+  it("rejects empty private key files", async () => {
+    const artifactPath = path.join(tempDir, "artifact.txt");
+    await fs.writeFile(artifactPath, "demo", "utf8");
+
+    const privateKeyPath = path.join(tempDir, "private-empty.key");
+    await fs.writeFile(privateKeyPath, "   \n", "utf8");
+
+    const metadata = await createMetadata({
+      version: "0.1.0",
+      commit: "1234567890abcdef1234567890abcdef12345678",
+      builder: "openguard-cli/0.1.0",
+      timestamp: "2026-02-09T00:00:00.000Z",
+    });
+
+    const signed = await signArtifact({
+      artifactPath,
+      privateKeyPath,
+      metadata,
+    });
+    expect(signed.ok).toBe(false);
+    if (signed.ok) {
+      return;
+    }
+    expect(signed.error.message).toContain("Key file is empty");
+  });
+
   it("rejects public key with wrong length", async () => {
     const artifactPath = path.join(tempDir, "artifact.txt");
     await fs.writeFile(artifactPath, "demo", "utf8");
@@ -248,6 +386,33 @@ describe("trust signing", () => {
       return;
     }
     expect(verified.error.message).toContain("Unsupported payload type");
+  });
+
+  it("rejects malformed signature envelopes", async () => {
+    const artifactPath = path.join(tempDir, "artifact.txt");
+    await fs.writeFile(artifactPath, "demo", "utf8");
+
+    const privateKey = Buffer.alloc(32, 8);
+    const publicKey = await getPublicKey(privateKey);
+    const publicKeyPath = path.join(tempDir, "public.key");
+    const sigPath = path.join(tempDir, "artifact.sig.json");
+    await fs.writeFile(
+      publicKeyPath,
+      Buffer.from(publicKey).toString("hex"),
+      "utf8",
+    );
+    await fs.writeFile(sigPath, JSON.stringify({ signature: "abc" }), "utf8");
+
+    const verified = await verifyArtifact({
+      artifactPath,
+      signaturePath: sigPath,
+      publicKeyPath,
+    });
+    expect(verified.ok).toBe(false);
+    if (verified.ok) {
+      return;
+    }
+    expect(verified.error.message).toContain("Invalid signature envelope");
   });
 
   it("fails strict verification for non-SHA commit metadata", async () => {
@@ -356,5 +521,32 @@ describe("trust signing", () => {
     expect(verified.error.message).toContain(
       "timestamp must use canonical ISO-8601 UTC format",
     );
+  });
+
+  it("rejects invalid signature envelopes", async () => {
+    const artifactPath = path.join(tempDir, "artifact.txt");
+    await fs.writeFile(artifactPath, "demo", "utf8");
+
+    const privateKey = Buffer.alloc(32, 8);
+    const publicKey = await getPublicKey(privateKey);
+    const publicKeyPath = path.join(tempDir, "public.key");
+    const sigPath = path.join(tempDir, "artifact.sig.json");
+    await fs.writeFile(
+      publicKeyPath,
+      Buffer.from(publicKey).toString("hex"),
+      "utf8",
+    );
+    await fs.writeFile(sigPath, JSON.stringify({ payload_hash: "sha256:test" }));
+
+    const verified = await verifyArtifact({
+      artifactPath,
+      signaturePath: sigPath,
+      publicKeyPath,
+    });
+    expect(verified.ok).toBe(false);
+    if (verified.ok) {
+      return;
+    }
+    expect(verified.error.message).toContain("Invalid signature envelope");
   });
 });

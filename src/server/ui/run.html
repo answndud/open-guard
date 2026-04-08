@@ -7,48 +7,158 @@
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <div class="page">
-      <header class="hero">
-        <div>
-          <p class="eyebrow">Run details</p>
+    <div class="app-shell">
+      <header class="page-header page-header-compact">
+        <div class="page-heading">
+          <a class="back-link" href="/">Back to dashboard</a>
+          <p class="page-kicker">Run triage</p>
           <h1 id="run-title">Run</h1>
-          <p class="subtitle" id="run-subtitle">Loading run details.</p>
+          <p class="page-description" id="run-subtitle">Loading run details.</p>
         </div>
-        <div class="stat">
-          <div class="stat-label">Total score</div>
-          <div class="stat-value" id="run-score">--</div>
-          <div class="stat-meta" id="run-risk">--</div>
+        <div class="callout-card">
+          <div class="callout-label">Inspection mode</div>
+          <p class="callout-copy">
+            Pick a finding on the left to inspect its description, confidence,
+            remediation, snippet, and source kind.
+          </p>
+          <div class="callout-meta" id="run-policy-meta">Policy loading...</div>
+          <div class="stack-actions">
+            <button class="button-secondary" id="run-rerun-button" type="button">
+              Rerun saved request
+            </button>
+          </div>
         </div>
       </header>
 
-      <section class="panel">
-        <div class="panel-header">
-          <h2>Findings</h2>
-          <span class="panel-meta" id="run-findings-meta">--</span>
-        </div>
-        <div class="panel-body">
-          <table class="table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Severity</th>
-                <th>Rule</th>
-                <th>File</th>
-                <th>Line</th>
-              </tr>
-            </thead>
-            <tbody id="run-findings-table">
-              <tr>
-                <td colspan="5" class="empty">No findings yet.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
+      <main class="page-content">
+        <section class="kpi-grid">
+          <article class="kpi-card">
+            <div class="kpi-label">Total score</div>
+            <div class="kpi-value" id="run-score">--</div>
+            <div class="kpi-meta" id="run-risk">--</div>
+          </article>
+          <article class="kpi-card">
+            <div class="kpi-label">Finding count</div>
+            <div class="kpi-value" id="run-findings-total">--</div>
+            <div class="kpi-meta" id="run-findings-meta">--</div>
+          </article>
+          <article class="kpi-card">
+            <div class="kpi-label">Target</div>
+            <div class="kpi-value kpi-value-text" id="run-target-label">--</div>
+            <div class="kpi-meta">Resolved scan input</div>
+          </article>
+          <article class="kpi-card">
+            <div class="kpi-label">Scan metadata</div>
+            <div class="kpi-value kpi-value-text" id="run-scan-meta">--</div>
+            <div class="kpi-meta">Rules and duration</div>
+          </article>
+        </section>
 
-      <footer class="footer">
-        <a href="/">Back to dashboard</a>
-      </footer>
+        <section class="run-workspace">
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="panel-kicker">Findings</p>
+                <h2>Selectable findings</h2>
+              </div>
+              <span class="panel-meta" id="run-table-meta">Ordered by severity</span>
+            </div>
+            <div class="selection-list" id="finding-list">
+              <p class="empty-copy">Loading findings...</p>
+            </div>
+          </section>
+
+          <section class="panel detail-pane">
+            <div class="panel-header">
+              <div>
+                <p class="panel-kicker">Inspector</p>
+                <h2 id="detail-title">Finding detail</h2>
+              </div>
+              <span class="panel-meta" id="detail-meta">No selection</span>
+            </div>
+
+            <div class="tab-strip" role="tablist" aria-label="Run detail views">
+              <button class="tab-button is-active" type="button" data-view="finding">Finding</button>
+              <button class="tab-button" type="button" data-view="policy">Policy YAML</button>
+              <button class="tab-button" type="button" data-view="raw">Raw JSON</button>
+            </div>
+
+            <section class="tab-panel" data-panel="finding">
+              <div class="detail-card">
+                <dl class="detail-list" id="finding-meta">
+                  <dt>Rule</dt>
+                  <dd>--</dd>
+                  <dt>Severity</dt>
+                  <dd>--</dd>
+                  <dt>Category</dt>
+                  <dd>--</dd>
+                  <dt>Confidence</dt>
+                  <dd>--</dd>
+                  <dt>Source kind</dt>
+                  <dd>--</dd>
+                  <dt>File</dt>
+                  <dd>--</dd>
+                  <dt>Line</dt>
+                  <dd>--</dd>
+                </dl>
+              </div>
+
+              <div class="detail-card">
+                <div class="panel-header">
+                  <div>
+                    <p class="panel-kicker">Description</p>
+                    <h3>What it means</h3>
+                  </div>
+                </div>
+                <p class="detail-text" id="finding-description">Select a finding to inspect it.</p>
+              </div>
+
+              <div class="detail-card">
+                <div class="panel-header">
+                  <div>
+                    <p class="panel-kicker">Remediation</p>
+                    <h3>Recommended fix</h3>
+                  </div>
+                </div>
+                <p class="detail-text" id="finding-remediation">--</p>
+              </div>
+
+              <div class="detail-card">
+                <div class="panel-header">
+                  <div>
+                    <p class="panel-kicker">Evidence</p>
+                    <h3>Snippet and context</h3>
+                  </div>
+                </div>
+                <p class="detail-copy" id="finding-snippet-meta">--</p>
+                <pre class="code-block" id="finding-snippet">--</pre>
+              </div>
+
+              <div class="detail-card">
+                <div class="panel-header">
+                  <div>
+                    <p class="panel-kicker">Tags</p>
+                    <h3>Rule tags</h3>
+                  </div>
+                </div>
+                <div class="chip-list" id="finding-tags">
+                  <span class="empty-chip">No tags</span>
+                </div>
+              </div>
+            </section>
+
+            <section class="tab-panel is-hidden" data-panel="policy">
+              <p class="panel-copy" id="policy-status">Loading policy YAML...</p>
+              <pre class="code-block code-block-scroll" id="policy-view">Loading...</pre>
+            </section>
+
+            <section class="tab-panel is-hidden" data-panel="raw">
+              <p class="panel-copy" id="raw-status">Loading JSON report...</p>
+              <pre class="code-block code-block-scroll" id="raw-view">Loading...</pre>
+            </section>
+          </section>
+        </section>
+      </main>
     </div>
 
     <script src="/run.js"></script>

@@ -29,6 +29,8 @@ tmp/
 
 # Local data
 .openguard/
+.openguard-qa/
+.openguard-qa-check/
 PLAN.md
 PROGRESS.md
 

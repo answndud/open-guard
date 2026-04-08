@@ -7,71 +7,380 @@
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <div class="page">
-      <header class="hero">
-        <div>
-          <p class="eyebrow">OpenGuard Local Dashboard</p>
-          <h1>Scan visibility, without leaving your machine.</h1>
-          <p class="subtitle">
-            Latest scan score, findings, and policy status from your local runs.
+    <div class="app-shell">
+      <header class="page-header">
+        <div class="page-heading">
+          <p class="page-kicker">OpenGuard local dashboard</p>
+          <h1>Dashboard-first workspace</h1>
+          <p class="page-description">
+            Start scans, generate policy, sign artifacts, verify provenance, and
+            inspect the full audit trail without leaving the browser.
           </p>
         </div>
-        <div class="stat" id="summary-card">
-          <div class="stat-label">Latest score</div>
-          <div class="stat-value" id="summary-score">--</div>
-          <div class="stat-meta" id="summary-risk">No data</div>
+        <div class="callout-card callout-strong">
+          <div class="callout-label">Local-only execution</div>
+          <p class="callout-copy" id="dashboard-note">
+            Jobs run on this machine only. Review the exact request before you
+            launch anything sensitive.
+          </p>
+          <div class="callout-meta" id="dashboard-refresh">Waiting for data...</div>
         </div>
       </header>
 
-      <section class="grid">
-        <div class="panel">
-          <div class="panel-header">
-            <h2>Score trend</h2>
-            <span class="panel-meta" id="trend-meta">No runs yet</span>
-          </div>
-          <div class="panel-body">
-            <svg id="trend-chart" viewBox="0 0 300 120"></svg>
-          </div>
-        </div>
-        <div class="panel">
-          <div class="panel-header">
-            <h2>Latest findings</h2>
-            <span class="panel-meta" id="findings-meta">--</span>
-          </div>
-          <div class="panel-body" id="findings-list">
-            <p class="empty">No findings yet.</p>
-          </div>
-        </div>
-      </section>
+      <main class="page-content">
+        <section class="kpi-grid">
+          <article class="kpi-card">
+            <div class="kpi-label">Latest score</div>
+            <div class="kpi-value" id="summary-score">--</div>
+            <div class="kpi-meta" id="summary-risk">No data</div>
+          </article>
+          <article class="kpi-card">
+            <div class="kpi-label">Open jobs</div>
+            <div class="kpi-value" id="summary-jobs">--</div>
+            <div class="kpi-meta">Queued or running</div>
+          </article>
+          <article class="kpi-card">
+            <div class="kpi-label">Targets tracked</div>
+            <div class="kpi-value" id="summary-targets">--</div>
+            <div class="kpi-meta">Saved target records</div>
+          </article>
+          <article class="kpi-card">
+            <div class="kpi-label">Latest findings</div>
+            <div class="kpi-value" id="summary-findings">--</div>
+            <div class="kpi-meta">Latest scanned run</div>
+          </article>
+          <article class="kpi-card">
+            <div class="kpi-label">Policy</div>
+            <div class="kpi-value kpi-value-text" id="summary-policy">--</div>
+            <div class="kpi-meta">Latest run attachment</div>
+          </article>
+          <article class="kpi-card">
+            <div class="kpi-label">Last target</div>
+            <div class="kpi-value kpi-value-text" id="summary-target">--</div>
+            <div class="kpi-meta">Most recent scan target</div>
+          </article>
+        </section>
 
-      <section class="panel">
-        <div class="panel-header">
-          <h2>Recent runs</h2>
-          <span class="panel-meta" id="runs-meta">--</span>
-        </div>
-        <div class="panel-body">
-          <table class="table">
-            <thead>
-              <tr>
-                <th>Run ID</th>
-                <th>Score</th>
-                <th>Policy</th>
-              </tr>
-            </thead>
-            <tbody id="runs-table">
-              <tr>
-                <td colspan="3" class="empty">No runs saved yet.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
+        <section class="panel panel-action">
+          <div class="panel-header">
+            <div>
+              <p class="panel-kicker">Action center</p>
+              <h2>Launch local work</h2>
+            </div>
+            <span class="panel-meta">Visible, local, and auditable</span>
+          </div>
+          <p class="panel-copy">
+            The dashboard can start scans, generate policy, sign artifacts, and
+            verify provenance. Each form posts a job into the local execution
+            queue.
+          </p>
 
-      <footer class="footer">
-        <div>
-          Save runs with: <code>openguard scan &lt;target&gt; --save-run</code>
-        </div>
-      </footer>
+          <div class="action-grid">
+            <form class="action-card action-form" id="scan-form">
+              <div class="action-card-header">
+                <h3>Scan</h3>
+                <span class="status-pill status-pill-neutral">scan</span>
+              </div>
+              <div class="field-grid">
+                <label class="field">
+                  <span class="field-label">Target</span>
+                  <input id="scan-target" name="target" type="text" placeholder="." />
+                </label>
+                <label class="field">
+                  <span class="field-label">Diff base</span>
+                  <input
+                    id="scan-diff-base"
+                    name="diff_base"
+                    type="text"
+                    placeholder="main"
+                  />
+                </label>
+                <label class="field">
+                  <span class="field-label">Rules dir</span>
+                  <input
+                    id="scan-rules-dir"
+                    name="rules_dir"
+                    type="text"
+                    placeholder="./rules"
+                  />
+                </label>
+                <label class="field">
+                  <span class="field-label">Policy path</span>
+                  <input
+                    id="scan-policy-path"
+                    name="policy_path"
+                    type="text"
+                    placeholder="./policy.yaml"
+                  />
+                </label>
+                <label class="field">
+                  <span class="field-label">Threshold</span>
+                  <input id="scan-threshold" name="threshold" type="number" min="0" />
+                </label>
+                <label class="field">
+                  <span class="field-label">Max findings</span>
+                  <input
+                    id="scan-max-findings"
+                    name="max_findings"
+                    type="number"
+                    min="1"
+                  />
+                </label>
+                <label class="field">
+                  <span class="field-label">Show</span>
+                  <select id="scan-show" name="show">
+                    <option value="all">All</option>
+                    <option value="summary">Summary</option>
+                    <option value="findings">Findings</option>
+                  </select>
+                </label>
+              </div>
+              <label class="checkbox-line">
+                <input id="scan-show-evidence" name="show_evidence" type="checkbox" />
+                <span>Include evidence snippets in output</span>
+              </label>
+              <label class="checkbox-line">
+                <input id="scan-save-run" name="save_run" type="checkbox" checked />
+                <span>Save the run to dashboard history</span>
+              </label>
+              <div class="submit-row">
+                <button class="button-primary" type="submit">Start scan</button>
+                <span class="form-status" id="scan-result"></span>
+              </div>
+            </form>
+
+            <form class="action-card action-form" id="policy-form">
+              <div class="action-card-header">
+                <h3>Generate policy</h3>
+                <span class="status-pill status-pill-neutral">policy</span>
+              </div>
+              <div class="field-grid">
+                <label class="field">
+                  <span class="field-label">Target</span>
+                  <input id="policy-target" name="target" type="text" placeholder="." />
+                </label>
+                <label class="field">
+                  <span class="field-label">Merge file</span>
+                  <input id="policy-merge" name="merge" type="text" placeholder="./policy.yaml" />
+                </label>
+                <label class="field">
+                  <span class="field-label">Rules dir</span>
+                  <input
+                    id="policy-rules-dir"
+                    name="rules_dir"
+                    type="text"
+                    placeholder="./rules"
+                  />
+                </label>
+              </div>
+              <label class="checkbox-line">
+                <input id="policy-save-run" name="save_run" type="checkbox" checked />
+                <span>Save the generated policy with the run</span>
+              </label>
+              <div class="submit-row">
+                <button class="button-primary" type="submit">Generate policy</button>
+                <span class="form-status" id="policy-result"></span>
+              </div>
+            </form>
+
+            <form class="action-card action-form" id="sign-form">
+              <div class="action-card-header">
+                <h3>Sign artifact</h3>
+                <span class="status-pill status-pill-warning">sensitive</span>
+              </div>
+              <div class="field-grid">
+                <label class="field">
+                  <span class="field-label">Artifact</span>
+                  <input
+                    id="sign-artifact"
+                    name="artifact"
+                    type="text"
+                    placeholder="./artifact.tar"
+                  />
+                </label>
+                <label class="field">
+                  <span class="field-label">Private key</span>
+                  <input id="sign-key" name="key" type="text" placeholder="./private.key" />
+                </label>
+                <label class="field">
+                  <span class="field-label">Output file</span>
+                  <input
+                    id="sign-out"
+                    name="out"
+                    type="text"
+                    placeholder="./artifact.sig.json"
+                  />
+                </label>
+              </div>
+              <label class="checkbox-line">
+                <input id="sign-confirm" name="confirm_local" type="checkbox" />
+                <span>I confirm this runs only on this machine</span>
+              </label>
+              <div class="submit-row">
+                <button class="button-primary" type="submit">Create signature</button>
+                <span class="form-status" id="sign-result"></span>
+              </div>
+            </form>
+
+            <form class="action-card action-form" id="verify-form">
+              <div class="action-card-header">
+                <h3>Verify artifact</h3>
+                <span class="status-pill status-pill-warning">sensitive</span>
+              </div>
+              <div class="field-grid">
+                <label class="field">
+                  <span class="field-label">Artifact</span>
+                  <input
+                    id="verify-artifact"
+                    name="artifact"
+                    type="text"
+                    placeholder="./artifact.tar"
+                  />
+                </label>
+                <label class="field">
+                  <span class="field-label">Public key</span>
+                  <input id="verify-pub" name="pub" type="text" placeholder="./public.key" />
+                </label>
+                <label class="field">
+                  <span class="field-label">Signature</span>
+                  <input
+                    id="verify-signature"
+                    name="signature"
+                    type="text"
+                    placeholder="./artifact.sig.json"
+                  />
+                </label>
+              </div>
+              <label class="checkbox-line">
+                <input id="verify-strict" name="strict" type="checkbox" />
+                <span>Use strict provenance checks</span>
+              </label>
+              <label class="checkbox-line">
+                <input id="verify-confirm" name="confirm_local" type="checkbox" />
+                <span>I confirm this runs only on this machine</span>
+              </label>
+              <div class="submit-row">
+                <button class="button-primary" type="submit">Verify signature</button>
+                <span class="form-status" id="verify-result"></span>
+              </div>
+            </form>
+          </div>
+        </section>
+
+        <section class="dashboard-grid">
+          <div class="dashboard-main">
+            <section class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="panel-kicker">Targets</p>
+                  <h2>Tracked targets</h2>
+                </div>
+                <span class="panel-meta" id="targets-meta">No targets yet</span>
+              </div>
+              <div class="table-wrap">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Target</th>
+                      <th>Latest run</th>
+                      <th>Last action</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="targets-table">
+                    <tr>
+                      <td colspan="4" class="empty-cell">No target records yet.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="panel-kicker">Runs</p>
+                  <h2>Recent run history</h2>
+                </div>
+                <span class="panel-meta" id="runs-table-meta">No runs yet</span>
+              </div>
+              <div class="table-wrap">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Run</th>
+                      <th>Saved</th>
+                      <th class="align-right">Score</th>
+                      <th>Policy</th>
+                    </tr>
+                  </thead>
+                  <tbody id="runs-table">
+                    <tr>
+                      <td colspan="4" class="empty-cell">No runs saved yet.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="panel-kicker">Jobs</p>
+                  <h2>Execution queue</h2>
+                </div>
+                <span class="panel-meta" id="jobs-meta">No jobs yet</span>
+              </div>
+              <div class="table-wrap">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Job</th>
+                      <th>Action</th>
+                      <th>Status</th>
+                      <th>Target</th>
+                      <th class="align-right">Created</th>
+                    </tr>
+                  </thead>
+                  <tbody id="jobs-table">
+                    <tr>
+                      <td colspan="5" class="empty-cell">No jobs queued yet.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+
+          <aside class="dashboard-side">
+            <section class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="panel-kicker">Selected job</p>
+                  <h2>Live job detail</h2>
+                </div>
+                <span class="panel-meta" id="job-detail-status">Waiting</span>
+              </div>
+              <div class="detail-stack" id="job-detail">
+                <p class="empty-copy">Select a job to inspect the exact request and result.</p>
+              </div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="panel-kicker">Audit</p>
+                  <h2>Local audit trail</h2>
+                </div>
+                <span class="panel-meta" id="audit-meta">No audit events</span>
+              </div>
+              <div class="feed-list" id="audit-feed">
+                <p class="empty-copy">No audit events yet.</p>
+              </div>
+            </section>
+          </aside>
+        </section>
+      </main>
     </div>
 
     <script src="/app.js"></script>

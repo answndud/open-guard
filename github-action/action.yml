@@ -1,6 +1,9 @@
 name: "OpenGuard Scan"
 description: "Scan pull requests with OpenGuard and post security findings"
 inputs:
+  github-token:
+    description: "GitHub token used to read PR metadata and post comments"
+    required: false
   fail-on-score:
     description: "Fail check if total score >= this value"
     required: false

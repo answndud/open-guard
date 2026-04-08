@@ -51,6 +51,20 @@ describe("artifact hash", () => {
     expect(changedHash).not.toBe(baseHash);
   });
 
+  it("ignores internal symlink cycles when hashing directories", async () => {
+    const root = await makeTempDir();
+    const nestedDir = path.join(root, "nested");
+    await fs.mkdir(nestedDir, { recursive: true });
+    await fs.writeFile(path.join(nestedDir, "a.txt"), "A", "utf8");
+
+    const baseHash = await hashArtifact(root);
+
+    await fs.symlink(root, path.join(nestedDir, "loop"));
+
+    const loopHash = await hashArtifact(root);
+    expect(loopHash).toBe(baseHash);
+  });
+
   it("throws for unsupported artifact types", async () => {
     if (process.platform === "win32") {
       return;

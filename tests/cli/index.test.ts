@@ -23,6 +23,9 @@ describe("cli entrypoint helpers", () => {
     expect(
       parseOptionalNumberOption(undefined, { name: "threshold", min: 0 }),
     ).toBeUndefined();
+    expect(() =>
+      parseOptionalNumberOption(null, { name: "threshold", min: 0 }),
+    ).toThrow("expected numeric value");
     expect(
       parseOptionalNumberOption("80", { name: "threshold", min: 0, max: 100 }),
     ).toBe(80);
@@ -47,6 +50,13 @@ describe("cli entrypoint helpers", () => {
         max: 100,
       }),
     ).toThrow("must be <= 100");
+    expect(() =>
+      parseOptionalNumberOption(101, {
+        name: "threshold",
+        min: 0,
+        max: 100,
+      }),
+    ).toThrow("expected numeric value");
   });
 
   it("validates required numeric options", () => {
@@ -59,6 +69,14 @@ describe("cli entrypoint helpers", () => {
       }),
     ).toBe(8787);
     expect(() =>
+      parseRequiredNumberOption(undefined, {
+        name: "port",
+        min: 1,
+        max: 65535,
+        integer: true,
+      }),
+    ).toThrow("expected numeric value");
+    expect(() =>
       parseRequiredNumberOption("0", {
         name: "port",
         min: 1,
@@ -66,6 +84,14 @@ describe("cli entrypoint helpers", () => {
         integer: true,
       }),
     ).toThrow("must be >= 1");
+    expect(() =>
+      parseRequiredNumberOption(undefined, {
+        name: "port",
+        min: 1,
+        max: 65535,
+        integer: true,
+      }),
+    ).toThrow("expected numeric value");
   });
 
   it("normalizes show option", () => {
@@ -87,16 +113,59 @@ describe("cli entrypoint helpers", () => {
       expect(shouldLaunchInteractive(["node", "openguard", "--help"])).toBe(
         false,
       );
+      expect(shouldLaunchInteractive(["node", "openguard", "-V"])).toBe(false);
       expect(
         shouldLaunchInteractive(["node", "openguard", "--no-interactive"]),
       ).toBe(false);
 
       process.env.CI = "1";
       expect(shouldLaunchInteractive(["node", "openguard"])).toBe(false);
+      delete process.env.CI;
+
+      process.env.GITHUB_ACTIONS = "true";
+      expect(shouldLaunchInteractive(["node", "openguard"])).toBe(false);
     } finally {
       restore();
       restoreEnv("CI", prevCi);
       restoreEnv("GITHUB_ACTIONS", prevActions);
+    }
+  });
+
+  it("blocks interactive menu in automation or non-tty contexts", () => {
+    const prevCi = process.env.CI;
+    const prevActions = process.env.GITHUB_ACTIONS;
+    const restore = setTty(false, true);
+
+    try {
+      delete process.env.CI;
+      delete process.env.GITHUB_ACTIONS;
+      expect(shouldLaunchInteractive(["node", "openguard"])).toBe(false);
+    } finally {
+      restore();
+    }
+
+    const restoreTty = setTty(true, true);
+    try {
+      process.env.GITHUB_ACTIONS = "true";
+      expect(shouldLaunchInteractive(["node", "openguard"])).toBe(false);
+      delete process.env.GITHUB_ACTIONS;
+      expect(shouldLaunchInteractive(["node", "openguard", "--version"])).toBe(
+        false,
+      );
+    } finally {
+      restoreTty();
+      restoreEnv("CI", prevCi);
+      restoreEnv("GITHUB_ACTIONS", prevActions);
+    }
+  });
+
+  it("does not launch interactive menu without tty", () => {
+    const restore = setTty(false, true);
+
+    try {
+      expect(shouldLaunchInteractive(["node", "openguard"])).toBe(false);
+    } finally {
+      restore();
     }
   });
 
@@ -108,10 +177,11 @@ describe("cli entrypoint helpers", () => {
   });
 
   it("parses yes/no prompt answers", async () => {
-    const rl = fakeRl(["", "yes", "n"]);
+    const rl = fakeRl(["", "yes", "n", "maybe"]);
 
     await expect(promptYesNo(rl, "Continue", true)).resolves.toBe(true);
     await expect(promptYesNo(rl, "Continue", false)).resolves.toBe(true);
+    await expect(promptYesNo(rl, "Continue", true)).resolves.toBe(false);
     await expect(promptYesNo(rl, "Continue", true)).resolves.toBe(false);
   });
 

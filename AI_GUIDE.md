@@ -1,57 +1,58 @@
-# AI Development Guide for OpenGuard
+# OpenGuard AI 개발 가이드
 
-> **This document is for AI coding agents** (OpenCode, Cursor, Claude Code, etc.) to follow when implementing OpenGuard. It defines constraints, implementation order, coding standards, and module-by-module instructions.
+> **이 문서는 AI 코딩 에이전트용 안내서입니다.** OpenCode, Cursor, Claude Code 같은 도구가 OpenGuard를 구현할 때 따라야 할 제약 조건, 구현 순서, 코딩 기준, 모듈별 지침을 정의합니다.
 
-## 1. Project Goal
+## 1. 프로젝트 목표
 
-Implement OpenGuard MVP — a security scanner and trust layer for AI agent skills:
-- Static scanner with rule-based findings and multi-axis risk scoring
-- Least-privilege policy generator (YAML)
-- GitHub PR comment bot (Action)
-- Minimal SLSA-lite signing/verification
+OpenGuard MVP를 구현합니다. 핵심 목표는 다음과 같습니다.
 
-## 2. Non-Negotiable Constraints
+- 규칙 기반 finding과 다축 위험 점수를 제공하는 정적 스캐너
+- 최소 권한 정책 생성기(YAML)
+- GitHub PR 댓글 봇(Action)
+- 최소 수준의 SLSA-lite 서명/검증 기능
 
-These rules must NEVER be violated:
+## 2. 절대 깨면 안 되는 제약
 
-1. **No data exfiltration** — Scanner must NEVER send scanned code, findings, or any data to external services
-2. **Deterministic output** — Same input must ALWAYS produce the same Finding IDs and scores. Use hash(rule_id + file_path + start_line + matched_text) for Finding IDs
-3. **Evidence required** — Every Finding must include evidence: file path, line range, code snippet, and matched pattern
-4. **No code execution** — Scanner must NEVER execute, eval, or import scanned code
-5. **Offline operation** — Scanning must work without internet access (after initial repo clone)
-6. **High signal only** — Prefer fewer, higher-quality findings over noisy detection. When in doubt, require higher confidence
-7. **Secret masking** — All logging must mask patterns that look like API keys, tokens, passwords (regex: patterns starting with `sk-`, `ghp_`, `AKIA`, etc.)
+아래 규칙은 반드시 지켜야 합니다.
 
-## 3. Technology Stack
+1. **데이터 유출 금지**: 스캐너는 스캔한 코드, finding, 그 외 어떤 데이터도 외부 서비스로 보내면 안 된다
+2. **결정적 출력**: 같은 입력은 항상 같은 Finding ID와 점수를 생성해야 한다. Finding ID는 `hash(rule_id + file_path + start_line + matched_text)` 기반으로 만든다
+3. **증거 필수**: 모든 Finding에는 파일 경로, 라인 범위, 코드 스니펫, 매칭 패턴이 포함되어야 한다
+4. **코드 실행 금지**: 스캐너는 스캔 대상 코드를 실행, eval, import 하면 안 된다
+5. **오프라인 동작**: 최초 저장소 clone 이후에는 인터넷 없이 스캔할 수 있어야 한다
+6. **고신호 우선**: 잡음 많은 탐지보다 적더라도 정확한 finding을 우선한다. 애매하면 confidence를 높게 요구한다
+7. **시크릿 마스킹**: 로그에는 `sk-`, `ghp_`, `AKIA`처럼 API 키/토큰/비밀번호로 보이는 패턴이 그대로 남으면 안 된다
 
-| Concern | Choice | Notes |
-|---------|--------|-------|
-| Language | TypeScript 5.x (strict mode) | `"strict": true` in tsconfig |
-| Runtime | Node.js 20+ (LTS) | Use built-in APIs where possible |
-| Package manager | pnpm | Lockfile must be committed |
-| CLI framework | commander | Lightweight, well-documented |
-| YAML | js-yaml | For rule loading and policy serialization |
-| Git operations | simple-git | For repo cloning and diff |
-| Crypto | @noble/ed25519 | For SLSA-lite signing/verification |
-| Hashing | Node.js `crypto` | For Finding IDs and content hashing |
-| Testing | vitest | Fast, TypeScript-native |
-| Build | tsup | For CLI binary bundling |
-| Linting | eslint + @typescript-eslint | Strict config |
-| Formatting | prettier | Consistent formatting |
+## 3. 기술 스택
 
-## 4. Coding Standards
+| 영역 | 선택 | 비고 |
+| --- | --- | --- |
+| 언어 | TypeScript 5.x (strict) | `tsconfig`에서 `"strict": true` |
+| 런타임 | Node.js 20+ | 가능한 한 내장 API 우선 사용 |
+| 패키지 매니저 | pnpm | lockfile 커밋 필수 |
+| CLI 프레임워크 | commander | 가볍고 문서가 잘 되어 있음 |
+| YAML | js-yaml | 규칙 로딩과 정책 직렬화용 |
+| Git 작업 | simple-git | clone, diff 등에 사용 |
+| 암호화 | @noble/ed25519 | SLSA-lite 서명/검증용 |
+| 해싱 | Node.js `crypto` | Finding ID, 콘텐츠 해시 |
+| 테스트 | vitest | 빠르고 TypeScript 친화적 |
+| 빌드 | tsup | CLI 번들링 |
+| 린트 | eslint + @typescript-eslint | 엄격한 구성 |
+| 포맷 | prettier | 일관된 스타일 유지 |
+
+## 4. 코딩 기준
 
 ### TypeScript
+
 ```typescript
-// ✅ DO: Use strict types
+// ✅ 권장: 엄격한 타입 사용
 interface Finding {
   readonly id: string;
   readonly ruleId: string;
   readonly severity: Severity;
-  // ...
 }
 
-// ✅ DO: Use const enums for fixed values
+// ✅ 권장: 고정값에는 const enum 사용
 const enum Severity {
   Info = 'info',
   Low = 'low',
@@ -60,215 +61,240 @@ const enum Severity {
   Critical = 'critical',
 }
 
-// ✅ DO: Use Result type for error handling
+// ✅ 권장: 예상 가능한 실패는 Result 타입 사용
 type Result<T, E = Error> = { ok: true; value: T } | { ok: false; error: E };
 
-// ❌ DON'T: Use `any`
-// ❌ DON'T: Use non-null assertion (!) without clear justification
-// ❌ DON'T: Throw errors for expected conditions (use Result)
-// ❌ DON'T: Use console.log (use the logger module)
+// ❌ 금지: any 사용
+// ❌ 금지: 근거 없는 non-null assertion(!)
+// ❌ 금지: 예상 가능한 오류에 예외 남발
+// ❌ 금지: console.log 사용
 ```
 
-### Error Handling
-- Use `Result<T, E>` types for operations that can fail expectedly
-- Throw only for programmer errors (bugs)
-- All error messages must be actionable ("Could not read file X: permission denied. Try running with sudo or check file permissions.")
-- Never expose internal paths or stack traces to end users
+### 오류 처리
 
-### Logging
-- Use a structured logger (pino or custom)
-- Levels: debug, info, warn, error
-- All log entries must include context (module, operation)
-- Secret masking applied to all log output
+- 예상 가능한 실패는 `Result<T, E>`로 다룬다
+- throw는 프로그래머 오류(버그)에만 사용한다
+- 오류 메시지는 사용자가 바로 행동할 수 있게 작성한다
+- 내부 경로와 스택 트레이스를 최종 사용자에게 노출하지 않는다
 
-### File I/O
-- All file reads are relative to the scan target
-- Never follow symlinks outside the target directory
-- Respect `.gitignore` and `.openguardignore`
-- File size limit: skip files > 1MB (configurable)
+### 로깅
 
-## 5. Module Implementation Order
+- 구조화된 로거(pino 또는 동급)를 사용한다
+- 로그 레벨은 `debug`, `info`, `warn`, `error`
+- 모든 로그에는 모듈/작업 맥락을 담는다
+- 로그 출력 전 시크릿 마스킹을 적용한다
 
-Implement in this order. Each module should be complete with tests before moving to the next.
+### 파일 I/O
 
-### Phase 1: Foundation
+- 모든 파일 읽기는 스캔 대상 루트 기준으로 처리한다
+- 대상 디렉터리 밖을 가리키는 symlink를 따라가지 않는다
+- `.gitignore`, `.openguardignore`를 존중한다
+- 기본 파일 크기 제한은 1MB(설정 가능)이다
 
-#### Module 1: `src/ingest/` — Repo Loader & File Discovery
+## 5. 모듈 구현 순서
 
-**Files to create:**
-- `src/ingest/index.ts` — Public API exports
-- `src/ingest/repo-loader.ts` — Clone remote repos, resolve local paths
-- `src/ingest/file-discovery.ts` — Walk directory tree, filter by ignore patterns
-- `src/ingest/file-classifier.ts` — Classify files by category (shell, js, yaml, etc.)
-- `src/ingest/types.ts` — FileEntry, FileCategory types
+아래 순서대로 구현합니다. 각 모듈은 테스트까지 마친 뒤 다음 단계로 넘어갑니다.
 
-**Key behaviors:**
-- `loadTarget(target: string): Promise<RepoContext>` — Returns repo metadata + file list
-- Git URL → clone to temp dir (cleanup on exit)
-- Local path → validate exists, resolve absolute
-- File discovery respects `.gitignore`, `.openguardignore`, and max file size
-- Classification maps file extensions to FileCategory enum
+### Phase 1: 기반 모듈
 
-**Tests:**
-- Local path with known file structure → correct classification
-- `.gitignore` patterns are respected
-- Large files are skipped
-- Symlinks outside target are not followed
+#### Module 1: `src/ingest/` — 저장소 로더와 파일 탐색
 
-#### Module 2: `src/scanner/` — Rule Engine & Evidence
+**생성할 파일**
 
-**Files to create:**
-- `src/scanner/index.ts` — Public API
-- `src/scanner/rule-loader.ts` — Load and validate rules/*.yaml
-- `src/scanner/rule-engine.ts` — Match rules against file content
-- `src/scanner/evidence.ts` — Extract evidence context
-- `src/scanner/finding-factory.ts` — Create Finding objects with stable IDs
-- `src/scanner/types.ts` — Rule, Finding, Evidence types
+- `src/ingest/index.ts`
+- `src/ingest/repo-loader.ts`
+- `src/ingest/file-discovery.ts`
+- `src/ingest/file-classifier.ts`
+- `src/ingest/types.ts`
 
-**Key behaviors:**
-- `loadRules(rulesDir: string): Rule[]` — Parse and validate rule YAML files
-- `scanFile(file: FileEntry, rules: Rule[]): Finding[]` — Run applicable rules
-- `scanTarget(files: FileEntry[], rules: Rule[]): Finding[]` — Scan all files
-- Evidence: capture ±3 lines context, matched text, line numbers
-- Finding ID: `sha256(rule_id + ':' + relative_path + ':' + start_line + ':' + matched_text).slice(0, 12)`
-- Deduplication: same Finding ID = same finding (keep first occurrence)
+**핵심 동작**
 
-**Tests:**
-- Each rule in rules catalog: at least 1 positive match test, 1 negative test
-- Evidence extraction includes correct line range
-- Finding IDs are stable across runs
-- Rules for wrong file category are skipped
+- `loadTarget(target: string): Promise<RepoContext>`
+- Git URL이면 임시 디렉터리로 clone 후 정리
+- 로컬 경로면 존재 여부와 디렉터리 여부 검증
+- `.gitignore`, `.openguardignore`, 최대 파일 크기를 반영한 파일 탐색
+- 확장자/패턴 기준 파일 유형 분류
 
-### Phase 2: Scoring & Policy
+**테스트**
 
-#### Module 3: `src/scoring/` — Risk Scoring
+- 알려진 구조를 가진 로컬 경로에서 올바른 분류가 되는지
+- `.gitignore` 패턴이 반영되는지
+- 큰 파일이 건너뛰어지는지
+- 루트 밖 symlink를 따라가지 않는지
 
-**Files to create:**
-- `src/scoring/index.ts` — Public API
-- `src/scoring/score-calculator.ts` — Compute subscores and total
-- `src/scoring/weights.ts` — Constants: severity points, confidence weights, category weights
-- `src/scoring/types.ts` — ScoreResult, Subscores types
+#### Module 2: `src/scanner/` — 규칙 엔진과 evidence
 
-**Key behaviors:**
-- See ARCHITECTURE.md Section 2.3 for the exact algorithm
-- Subscores capped at 100
-- Total score capped at 100
-- Critical finding floor: if any critical exists, total >= 60
-- Score must be deterministic
+**생성할 파일**
 
-**Tests:**
-- Known findings → expected subscores and total
-- Critical finding floor works
-- Empty findings → score 0
-- Category mapping is correct
+- `src/scanner/index.ts`
+- `src/scanner/rule-loader.ts`
+- `src/scanner/rule-engine.ts`
+- `src/scanner/evidence.ts`
+- `src/scanner/finding-factory.ts`
+- `src/scanner/types.ts`
 
-#### Module 4: `src/policy/` — Policy Generator
+**핵심 동작**
 
-**Files to create:**
-- `src/policy/index.ts` — Public API
-- `src/policy/policy-inferrer.ts` — Analyze findings to determine permissions
-- `src/policy/policy-serializer.ts` — Write YAML policy
-- `src/policy/policy-validator.ts` — Validate policy against schema
-- `src/policy/safe-lists.ts` — Built-in safe commands/domains/paths
-- `src/policy/types.ts` — Policy types
+- `loadRules(rulesDir: string): Rule[]`
+- `scanFile(file, rules): Finding[]`
+- `scanTarget(files, rules): Finding[]`
+- evidence는 매치 전후 3줄 맥락과 라인 번호를 포함
+- Finding ID는 `sha256(rule_id + ':' + relative_path + ':' + start_line + ':' + matched_text).slice(0, 12)`
+- 같은 ID는 같은 finding으로 보고 첫 항목만 유지
 
-**Key behaviors:**
-- `generatePolicy(findings: Finding[], context: RepoContext): Policy`
-- Commands found in scripts: safe ones → allow, risky ones → approval required
-- Domains found in network calls: known registries → allow, unknown → deny
-- Paths: project-scoped → allow, credential paths → deny
-- Output conforms to `schemas/policy.schema.json`
+**테스트**
 
-**Tests:**
-- Known findings → expected policy entries
-- Safe-listed commands are auto-allowed
-- Credential paths are always denied
-- Policy validates against schema
+- 각 규칙마다 최소 1개 positive, 1개 negative 테스트
+- evidence의 라인 범위가 정확한지
+- Finding ID가 실행마다 안정적인지
+- 잘못된 파일 유형에는 규칙이 적용되지 않는지
 
-### Phase 3: Output & Interface
+### Phase 2: 점수와 정책
 
-#### Module 5: `src/report/` — Report Formatters
+#### Module 3: `src/scoring/` — 위험 점수 계산
 
-**Files to create:**
-- `src/report/index.ts` — Public API
-- `src/report/json-reporter.ts` — Full JSON report
-- `src/report/markdown-reporter.ts` — Human-readable Markdown
-- `src/report/pr-comment-renderer.ts` — GitHub PR comment format
-- `src/report/types.ts` — Report types
+**생성할 파일**
 
-**Key behaviors:**
-- JSON report conforms to `schemas/report.schema.json`
-- Markdown includes risk score badge, findings table, evidence snippets
-- PR comment includes: score delta, new findings only, policy diff
-- PR comment is idempotent (includes HTML comment marker for update)
+- `src/scoring/index.ts`
+- `src/scoring/score-calculator.ts`
+- `src/scoring/weights.ts`
+- `src/scoring/types.ts`
 
-**Tests:**
-- JSON report validates against schema
-- Markdown renders correctly for known findings
-- PR comment diff: base findings vs head findings → only new shown
-- Snapshot tests for report formats
+**핵심 동작**
 
-#### Module 6: `src/cli/` — Command Line Interface
+- 정확한 알고리즘은 `ARCHITECTURE.md` 2.3절 기준
+- 서브스코어는 100 상한
+- 총점도 100 상한
+- critical finding이 있으면 총점은 최소 60
+- 결과는 항상 결정적이어야 함
 
-**Files to create:**
-- `src/cli/index.ts` — Entry point + command registration
-- `src/cli/scan-command.ts` — scan command handler
-- `src/cli/policy-command.ts` — policy generate command handler
-- `src/cli/sign-command.ts` — sign command handler
-- `src/cli/verify-command.ts` — verify command handler
+**테스트**
 
-**Key behaviors:**
-- Commands: `scan`, `policy generate`, `sign`, `verify`
-- See SPEC.md Section 7 for full CLI interface
-- Exit codes: 0 = success, 1 = error, 2 = findings exceed threshold
-- Colored output by default, `--no-color` flag
-- Progress indication for long scans
+- known findings 기준 기대 서브스코어/총점
+- critical floor 동작 확인
+- finding이 없을 때 0점
+- category 매핑 정확성
 
-**Tests:**
-- Integration tests: known fixture → expected output
-- Error cases: invalid path, invalid format, etc.
-- Exit code matches threshold behavior
+#### Module 4: `src/policy/` — 정책 생성기
 
-### Phase 4: Trust & CI
+**생성할 파일**
 
-#### Module 7: `src/trust/` — Signing & Verification
+- `src/policy/index.ts`
+- `src/policy/policy-inferrer.ts`
+- `src/policy/policy-serializer.ts`
+- `src/policy/policy-validator.ts`
+- `src/policy/safe-lists.ts`
+- `src/policy/types.ts`
 
-**Files to create:**
-- `src/trust/index.ts` — Public API
-- `src/trust/signer.ts` — Sign artifact hash with Ed25519
-- `src/trust/verifier.ts` — Verify signature
-- `src/trust/metadata.ts` — Generate provenance metadata
-- `src/trust/types.ts` — Signature, Metadata types
+**핵심 동작**
 
-**Key behaviors:**
-- Sign: hash(artifact contents) + metadata → Ed25519 signature
-- Verify: check signature against public key + validate metadata
-- Metadata: timestamp, version, commit SHA, builder info
-- See ARCHITECTURE.md Section 2.7 for signature envelope format
+- `generatePolicy(findings, context): Policy`
+- 스크립트 명령 중 안전한 것은 allow, 위험한 것은 승인 필요
+- 네트워크 호출 도메인 중 알려진 레지스트리는 allow, 나머지는 deny
+- 프로젝트 내부 경로는 allow, 자격 증명 경로는 deny
+- 출력은 `schemas/policy.schema.json`을 만족해야 함
 
-#### Module 8: `github-action/` — PR Comment Action
+**테스트**
 
-**Files to create:**
-- `github-action/action.yml` — Action metadata
-- `github-action/index.ts` — Action entry point
-- `github-action/pr-commenter.ts` — Post/update PR comment via API
+- known findings에 맞는 정책 엔트리 생성
+- safe list 명령 자동 허용
+- 자격 증명 경로는 항상 deny
+- 정책 스키마 검증 통과
 
-**Key behaviors:**
-- Triggered on `pull_request`
-- Runs scan on HEAD, optionally diff with BASE
-- Posts or updates comment (idempotent)
-- Sets check status based on threshold
-- Uses `@actions/core`, `@actions/github` packages
+### Phase 3: 출력과 인터페이스
 
-## 6. File Naming & Structure Conventions
+#### Module 5: `src/report/` — 리포트 포맷터
+
+**생성할 파일**
+
+- `src/report/index.ts`
+- `src/report/json-reporter.ts`
+- `src/report/markdown-reporter.ts`
+- `src/report/pr-comment-renderer.ts`
+- `src/report/types.ts`
+
+**핵심 동작**
+
+- JSON 리포트는 `schemas/report.schema.json` 준수
+- Markdown에는 위험 점수, finding 표, evidence 스니펫 포함
+- PR 댓글에는 점수 delta, 신규 finding, 정책 diff 포함
+- PR 댓글은 HTML marker를 이용해 idempotent 하게 갱신 가능해야 함
+
+**테스트**
+
+- JSON 리포트 스키마 검증
+- known findings에 대한 Markdown 렌더링
+- base/head 비교 시 신규 finding만 출력되는지
+- 리포트 포맷 스냅샷 테스트
+
+#### Module 6: `src/cli/` — 명령행 인터페이스
+
+**생성할 파일**
+
+- `src/cli/index.ts`
+- `src/cli/scan-command.ts`
+- `src/cli/policy-command.ts`
+- `src/cli/sign-command.ts`
+- `src/cli/verify-command.ts`
+
+**핵심 동작**
+
+- `scan`, `policy generate`, `sign`, `verify` 명령 제공
+- 전체 CLI 계약은 `SPEC.md` 7절 기준
+- 종료 코드: 0=성공, 1=오류, 2=임계값 초과
+- 기본 컬러 출력, `--no-color` 지원
+- 긴 스캔에는 진행 상황 표시 가능
+
+**테스트**
+
+- fixture 기준 통합 테스트
+- 잘못된 경로, 잘못된 포맷 등 오류 처리
+- 임계값 기준 종료 코드 확인
+
+### Phase 4: 신뢰 계층과 CI
+
+#### Module 7: `src/trust/` — 서명과 검증
+
+**생성할 파일**
+
+- `src/trust/index.ts`
+- `src/trust/signer.ts`
+- `src/trust/verifier.ts`
+- `src/trust/metadata.ts`
+- `src/trust/types.ts`
+
+**핵심 동작**
+
+- 서명: `hash(artifact contents) + metadata`를 Ed25519로 서명
+- 검증: 공개키로 서명 확인, 메타데이터 검증
+- 메타데이터: timestamp, version, commit SHA, builder 정보 포함
+- 서명 엔벌로프 형식은 `ARCHITECTURE.md` 2.7절 참고
+
+#### Module 8: `github-action/` — PR 댓글 Action
+
+**생성할 파일**
+
+- `github-action/action.yml`
+- `github-action/index.ts`
+- `github-action/pr-commenter.ts`
+
+**핵심 동작**
+
+- `pull_request` 이벤트에서 실행
+- HEAD를 스캔하고, 필요하면 BASE와 diff
+- 댓글 생성 또는 갱신(idempotent)
+- 임계값 기준으로 체크 상태 설정
+- `@actions/core`, `@actions/github` 사용
+
+## 6. 파일명과 구조 규칙
 
 ```
 src/
 ├── ingest/
-│   ├── index.ts           # Re-exports public API
-│   ├── types.ts           # Types for this module
-│   ├── repo-loader.ts     # Implementation
-│   └── __tests__/         # Module tests (or use tests/ at root)
+│   ├── index.ts
+│   ├── types.ts
+│   ├── repo-loader.ts
+│   └── __tests__/         # 또는 루트 tests/ 사용
 ├── scanner/
 │   ├── index.ts
 │   ├── types.ts
@@ -276,64 +302,67 @@ src/
 └── ...
 ```
 
-- Each module has an `index.ts` that exports the public API only
-- Types are in `types.ts` within each module
-- Shared types go in `src/types.ts`
-- Tests mirror source structure in `tests/` directory
+- 각 모듈은 공개 API만 export 하는 `index.ts`를 가진다
+- 모듈별 타입은 해당 디렉터리의 `types.ts`에 둔다
+- 공용 타입은 `src/types.ts`에 둔다
+- 테스트는 `tests/`에서 소스 구조를 반영한다
 
-## 7. Rule Development Protocol
+## 7. 규칙 개발 프로토콜
 
-When adding or modifying rules:
+규칙을 추가하거나 수정할 때는 다음 순서를 따른다.
 
-1. Add/edit rule definition in `rules/<category>.yaml`
-2. Add at least 2 tests: one positive match, one negative match
-3. Add test fixtures in `tests/fixtures/` if needed
-4. Update `docs/RULES_CATALOG.md` with the new rule entry
-5. Run full test suite: `pnpm test`
-6. Verify Finding IDs are stable (snapshot tests)
+1. `rules/<category>.yaml`에 규칙 추가/수정
+2. 최소 2개 테스트 추가: positive 1개, negative 1개
+3. 필요하면 `tests/fixtures/`에 테스트 픽스처 추가
+4. `docs/RULES_CATALOG.md` 갱신
+5. 전체 테스트 실행: `pnpm test`
+6. Finding ID 안정성 확인(스냅샷 테스트 포함)
 
-## 8. Output Contract
+## 8. 출력 계약
 
-All outputs must conform to JSON schemas in `schemas/`:
-- `finding.schema.json` — Individual finding format
-- `policy.schema.json` — Policy file format
-- `report.schema.json` — Scan report format
+모든 출력은 `schemas/` 아래 JSON 스키마를 따라야 한다.
 
-Any schema deviation must:
-1. Update the schema file
-2. Update all affected tests
-3. Bump version according to docs/VERSIONING.md
+- `finding.schema.json`: 개별 finding 형식
+- `policy.schema.json`: 정책 파일 형식
+- `report.schema.json`: 스캔 리포트 형식
 
-## 9. Suggested Prompts for AI Agents
+스키마를 바꾸는 경우에는 반드시:
 
-Use these prompts to guide implementation (one module at a time):
+1. 스키마 파일을 갱신하고
+2. 영향을 받는 테스트를 모두 수정하고
+3. `docs/VERSIONING.md` 기준으로 버전을 조정해야 한다
 
+## 9. AI 에이전트용 권장 프롬프트
+
+모듈 단위 구현을 유도할 때는 아래 형태의 프롬프트를 사용할 수 있다.
+
+```text
+"AI_GUIDE.md, ARCHITECTURE.md, SPEC.md를 읽은 뒤, AI_GUIDE.md Module 1 사양에 따라 ingest 모듈(src/ingest/)을 구현해라. 명시된 모든 파일과 테스트를 포함해 완성하라."
+
+"AI_GUIDE.md와 docs/RULES_CATALOG.md를 읽고, Module 2 지침에 맞게 scanner 모듈(src/scanner/)을 구현해라. rules/*.yaml에서 규칙을 로드하고 evidence 추출까지 포함하라. 모든 규칙에 대한 테스트를 추가하라."
+
+"AI_GUIDE.md와 ARCHITECTURE.md 2.3절을 읽고 scoring 모듈(src/scoring/)을 정확한 알고리즘으로 구현해라. empty findings, all critical, mixed categories 같은 edge case를 포함하라."
+
+"AI_GUIDE.md와 docs/POLICY.md를 읽고 policy 모듈(src/policy/)을 구현해라. docs/POLICY.md 6절의 safe list를 사용해 finding으로부터 YAML 정책을 생성하라."
+
+"AI_GUIDE.md를 읽고 report 모듈(src/report/)을 구현해라. JSON, Markdown, PR comment 포맷터를 포함하고, JSON은 schemas/report.schema.json을 만족해야 한다."
+
+"AI_GUIDE.md와 SPEC.md 7절을 읽고 commander 기반 CLI(src/cli/)를 구현해라. scan, policy, sign, verify 명령을 모두 연결하라."
+
+"AI_GUIDE.md의 Module 7 지침에 따라 @noble/ed25519 기반 SLSA-lite 서명/검증을 구현해라."
+
+"AI_GUIDE.md의 Module 8 지침에 따라 github-action/ 아래 PR 스캔 및 댓글 게시 Action을 구현해라."
 ```
-"Read AI_GUIDE.md, ARCHITECTURE.md, and SPEC.md. Then implement the ingest module (src/ingest/) following the specifications in AI_GUIDE.md Module 1. Create all listed files with full implementation and tests."
 
-"Read AI_GUIDE.md and docs/RULES_CATALOG.md. Then implement the scanner module (src/scanner/) following AI_GUIDE.md Module 2. Load rules from rules/*.yaml and implement pattern matching with evidence extraction. Add tests for every rule."
+## 10. 모듈별 완료 기준
 
-"Read AI_GUIDE.md and ARCHITECTURE.md Section 2.3. Implement the scoring module (src/scoring/) with the exact algorithm specified. Include edge cases: empty findings, all critical, mixed categories."
+모듈은 다음 조건을 모두 만족해야 완료로 본다.
 
-"Read AI_GUIDE.md and docs/POLICY.md. Implement the policy module (src/policy/) that generates YAML policies from findings. Use the safe-lists defined in docs/POLICY.md Section 6."
-
-"Read AI_GUIDE.md. Implement the report module (src/report/) with JSON, Markdown, and PR comment formatters. JSON must validate against schemas/report.schema.json."
-
-"Read AI_GUIDE.md and SPEC.md Section 7. Implement the CLI (src/cli/) using commander. Wire up all modules into scan, policy, sign, and verify commands."
-
-"Read AI_GUIDE.md Section Module 7. Implement SLSA-lite signing and verification using @noble/ed25519."
-
-"Read AI_GUIDE.md Section Module 8. Create the GitHub Action in github-action/ that scans PRs and posts comments."
-```
-
-## 10. Definition of Done (per module)
-
-A module is complete when:
-- [ ] All specified files are created
-- [ ] TypeScript compiles with zero errors (`pnpm tsc --noEmit`)
-- [ ] All tests pass (`pnpm test`)
-- [ ] No `any` types in implementation code
-- [ ] Error handling uses Result type for expected failures
-- [ ] Logging uses structured logger (not console.log)
-- [ ] Public API is exported from module `index.ts`
-- [ ] Integration with previous modules verified
+- [ ] 명시된 파일이 모두 생성되었다
+- [ ] TypeScript가 오류 없이 컴파일된다 (`pnpm tsc --noEmit`)
+- [ ] 모든 테스트가 통과한다 (`pnpm test`)
+- [ ] 구현 코드에 `any`가 없다
+- [ ] 예상 가능한 실패는 Result 타입으로 처리된다
+- [ ] 로깅은 구조화된 로거를 사용한다
+- [ ] 공개 API가 모듈의 `index.ts`에서 export 된다
+- [ ] 이전 모듈과의 통합이 검증되었다

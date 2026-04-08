@@ -22,6 +22,7 @@ import { resolveRulesDirectory } from "./runtime-paths.js";
 import type { ScanReport } from "../report/types.js";
 import type { Finding, Rule, RuleMeta } from "../scanner/types.js";
 import type { RepoContext } from "../ingest/types.js";
+import type { RunWriteOptions } from "../server/store.js";
 
 export interface ScanOptions {
   readonly target: string;
@@ -46,6 +47,7 @@ export interface ScanResult {
 export async function runScanCommand(
   options: ScanOptions,
   toolVersion: string,
+  runWriteOptions: RunWriteOptions = {},
 ): Promise<ScanResult> {
   const rulesDir = await resolveRulesDirectory();
   const repoContext = await loadTarget(options.target);
@@ -93,7 +95,7 @@ export async function runScanCommand(
     const policyYaml = report.recommended_policy
       ? serializePolicy(report.recommended_policy)
       : undefined;
-    await writeRun(dataDir, report, policyYaml);
+    await writeRun(dataDir, report, policyYaml, runWriteOptions);
     await ensureRunPersisted(dataDir);
   }
 

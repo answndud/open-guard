@@ -3,6 +3,7 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { handleApi } from "./api.js";
+import { createJobManager } from "./jobs.js";
 
 export interface ServerOptions {
   readonly port?: number;
@@ -19,8 +20,12 @@ const UI_ROOT = "ui";
 export async function startServer(
   options: ServerOptions = {},
 ): Promise<ServerHandle> {
+  const jobs = await createJobManager({ dataDir: options.dataDir });
   const server = http.createServer(async (req, res) => {
-    const handled = await handleApi(req, res, { dataDir: options.dataDir });
+    const handled = await handleApi(req, res, {
+      dataDir: options.dataDir,
+      jobs,
+    });
     if (handled) {
       return;
     }

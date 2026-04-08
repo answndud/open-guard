@@ -69,6 +69,26 @@ const highSignalFinding: Finding = {
   },
 };
 
+const ghaPermissionsFinding: Finding = {
+  id: "gha001def456",
+  rule_id: "OG-GHA-001",
+  severity: Severity.High,
+  category: "gha",
+  confidence: Confidence.High,
+  title: "Overly broad workflow permissions",
+  description: "Test",
+  remediation: "Test",
+  evidence: {
+    path: ".github/workflows/ci.yml",
+    context_start_line: 1,
+    context_end_line: 3,
+    start_line: 2,
+    end_line: 2,
+    snippet: "permissions: write-all",
+    match: "permissions: write-all",
+  },
+};
+
 const reportInput: ReportInput = {
   toolVersion: "0.1.0",
   target: { input: "./demo", resolved_path: "/tmp/demo", files_scanned: 1 },
@@ -185,6 +205,32 @@ describe("report", () => {
     expect(comment).toContain("Added allow.commands: `pnpm`");
     expect(comment).toContain("Added deny.commands: `curl`");
     expect(comment).toContain("Updated approvals.shell_exec.mode");
+  });
+
+  it("counts OG-GHA-001 as credentials in markdown summaries", () => {
+    const report = buildJsonReport({
+      ...reportInput,
+      findings: [ghaPermissionsFinding],
+      subscores: { shell: 0, network: 0, filesystem: 0, credentials: 15 },
+      totalScore: 15,
+    });
+
+    const markdown = renderMarkdownReport(report);
+    expect(markdown).toMatch(/\|\s*Shell\s*\|\s*0\s*\|\s*0\s*\|/);
+    expect(markdown).toMatch(/\|\s*Credentials\s*\|\s*15\s*\|\s*1\s*\|/);
+  });
+
+  it("counts OG-GHA-001 as credentials in pr comment summaries", () => {
+    const report = buildJsonReport({
+      ...reportInput,
+      findings: [ghaPermissionsFinding],
+      subscores: { shell: 0, network: 0, filesystem: 0, credentials: 15 },
+      totalScore: 15,
+    });
+
+    const comment = renderPrComment({ head: report });
+    expect(comment).toContain("| Shell | 0 | 0 |");
+    expect(comment).toContain("| Credentials | 15 | 1 |");
   });
 
   it("renders sarif report", () => {

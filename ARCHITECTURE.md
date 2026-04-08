@@ -1,25 +1,26 @@
-# OpenGuard Architecture (MVP)
+# OpenGuard 아키텍처 (MVP)
 
-## 1. System Overview
+## 1. 시스템 개요
 
-OpenGuard is a CLI-first TypeScript application that scans AI agent skills/workflows for security risks and generates least-privilege policies. A lightweight local server exposes scan history and policy status in a web UI. The architecture is designed for:
+OpenGuard는 CLI 중심의 TypeScript 애플리케이션입니다. AI 에이전트 스킬과 워크플로를 정적으로 분석해 보안 위험을 탐지하고, 최소 권한 정책을 생성합니다. 또한 가벼운 로컬 서버를 통해 스캔 이력과 정책 상태를 웹 UI로 확인할 수 있습니다.
 
-- **Extensibility** — New rules via YAML, new file types via plugins
-- **Determinism** — Same input always produces same output
-- **Offline operation** — No network required during analysis
-- **Composability** — Each module can be used independently
+이 아키텍처는 다음 원칙을 기준으로 설계되었습니다.
+
+- **확장성**: YAML 기반 규칙 추가, 새로운 파일 유형 확장 가능
+- **결정성**: 같은 입력은 항상 같은 결과를 생성
+- **오프라인 동작**: 분석 단계에서는 네트워크 없이도 동작
+- **조합 가능성**: 각 모듈을 독립적으로 사용할 수 있음
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│                         CLI (src/cli/)                            │
-│  Commands: scan | policy generate | sign | verify                │
-└──────┬───────────────┬──────────────────┬───────────────────┬────┘
-       │               │                  │                   │
+│                         CLI (src/cli/)                          │
+│  Commands: scan | policy generate | sign | verify | server      │
+└──────┬───────────────┬──────────────────┬───────────────────┬───┘
        │               │                  │                   │
        ▼               ▼                  ▼                   ▼
 ┌─────────────┐ ┌─────────────┐ ┌──────────────┐ ┌───────────────┐
-│   Ingest    │ │   Scanner   │ │    Policy     │ │    Trust      │
-│ (src/ingest)│ │(src/scanner)│ │ (src/policy)  │ │  (src/trust)  │
+│   Ingest    │ │   Scanner   │ │    Policy    │ │    Trust      │
+│ (src/ingest)│ │(src/scanner)│ │ (src/policy) │ │  (src/trust)  │
 │             │ │             │ │              │ │               │
 │ repo loader │ │ rule engine │ │ allowlist    │ │ sign/verify   │
 │ file class. │ │ evidence    │ │ inference    │ │ metadata      │
@@ -45,66 +46,66 @@ OpenGuard is a CLI-first TypeScript application that scans AI agent skills/workf
 └───────────────┘
 ```
 
-## 2. Component Details
+## 2. 구성 요소 상세
 
 ### 2.1 Ingest (`src/ingest/`)
 
-**Responsibility:** Load a target (local path or git URL) and classify files for scanning.
+**역할:** 스캔 대상(로컬 경로 또는 Git URL)을 로드하고, 분석 대상 파일을 분류합니다.
 
-**Modules:**
+**모듈**
 
-- `repo-loader.ts` — Clone remote repos (temp dir), resolve local paths
-- `file-discovery.ts` — Walk directory tree, respect `.gitignore` / `.openguardignore`
-- `file-classifier.ts` — Classify files by type for appropriate rule sets
+- `repo-loader.ts`: 원격 저장소를 임시 디렉터리로 clone 하거나, 로컬 경로를 검증 및 해석
+- `file-discovery.ts`: 디렉터리 트리를 순회하며 `.gitignore`, `.openguardignore`를 반영
+- `file-classifier.ts`: 파일 유형을 분류해 어떤 규칙 집합을 적용할지 결정
 
-**File Classification:**
+**파일 분류 예시**
 
-| Category        | Extensions / Patterns                                 |
-| --------------- | ----------------------------------------------------- |
-| `shell`         | `*.sh`, `*.bash`, `*.zsh`, `Makefile`, `Justfile`     |
-| `powershell`    | `*.ps1`, `*.psm1`, `*.psd1`                           |
-| `javascript`    | `*.js`, `*.mjs`, `*.cjs`                              |
-| `typescript`    | `*.ts`, `*.mts`, `*.cts`                              |
-| `python`        | `*.py`, `setup.py`, `setup.cfg`                       |
+| 분류 | 확장자 / 패턴 |
+| --- | --- |
+| `shell` | `*.sh`, `*.bash`, `*.zsh`, `Makefile`, `Justfile` |
+| `powershell` | `*.ps1`, `*.psm1`, `*.psd1` |
+| `javascript` | `*.js`, `*.mjs`, `*.cjs` |
+| `typescript` | `*.ts`, `*.mts`, `*.cts` |
+| `python` | `*.py`, `setup.py`, `setup.cfg` |
 | `yaml-workflow` | `.github/workflows/*.yml`, `.github/workflows/*.yaml` |
-| `yaml-config`   | `*.yml`, `*.yaml` (non-workflow)                      |
-| `markdown`      | `*.md`, `*.mdx`                                       |
-| `json-config`   | `package.json`, `composer.json`, `*.config.json`      |
-| `dockerfile`    | `Dockerfile`, `*.dockerfile`, `docker-compose*.yml`   |
-| `mcp-config`    | MCP server manifests, tool definitions                |
+| `yaml-config` | `*.yml`, `*.yaml`(워크플로 제외) |
+| `markdown` | `*.md`, `*.mdx` |
+| `json-config` | `package.json`, `composer.json`, `*.config.json` |
+| `dockerfile` | `Dockerfile`, `*.dockerfile`, `docker-compose*.yml` |
+| `mcp-config` | MCP 서버 매니페스트, 도구 정의 |
 
-**Output:** `FileEntry[]` — list of `{ path, category, content, size }`
+**출력:** `{ path, category, size }` 형태의 `FileEntry[]`
 
 ### 2.2 Scanner (`src/scanner/`)
 
-**Responsibility:** Run rules against classified files, produce findings with evidence.
+**역할:** 분류된 파일에 규칙을 적용해 finding과 증거를 생성합니다.
 
-**Modules:**
+**모듈**
 
-- `rule-loader.ts` — Parse `rules/*.yaml` into typed rule objects
-- `rule-engine.ts` — Match rules against file content, extract evidence
-- `evidence.ts` — Capture file path, line range, snippet, matched pattern
-- `finding-factory.ts` — Create Finding objects with stable IDs
+- `rule-loader.ts`: `rules/*.yaml`을 읽어 타입이 지정된 규칙 객체로 변환
+- `rule-engine.ts`: 파일 내용과 규칙을 매칭하고 finding 생성
+- `evidence.ts`: 파일 경로, 라인 범위, 스니펫, 매칭 텍스트 추출
+- `finding-factory.ts`: 안정적인 finding ID 생성
 
-**Rule Execution Flow:**
+**규칙 실행 흐름**
 
 ```
-For each FileEntry:
-  1. Select applicable rules (by file category + rule scope)
-  2. For each applicable rule:
-     a. Run pattern matcher (regex with context)
-     b. If match found:
-        - Extract evidence (line range, snippet, matched text)
-        - Create Finding with stable ID = hash(rule_id + path + start_line + match)
-  3. Deduplicate findings by ID
+각 FileEntry에 대해:
+  1. 파일 유형과 규칙 scope를 기준으로 적용 가능한 규칙을 선택
+  2. 각 규칙에 대해
+     a. 패턴 매처 실행(대부분 정규식 기반)
+     b. 매치되면
+        - 증거 추출(라인 범위, 스니펫, 매칭 문자열)
+        - 안정적인 ID를 가진 Finding 생성
+  3. ID 기준으로 중복 제거
 ```
 
-**Rule Definition Schema (YAML):**
+**규칙 정의 예시(YAML)**
 
 ```yaml
 id: OG-SHELL-001
-title: "Remote code execution via curl pipe"
-description: "Detects curl/wget output piped to shell execution"
+title: "curl 파이프를 통한 원격 코드 실행"
+description: "curl/wget 결과를 바로 셸로 넘겨 실행하는 패턴을 탐지한다"
 severity: critical
 confidence: high
 category: shell
@@ -112,27 +113,25 @@ scope:
   file_types: [shell, markdown, yaml-workflow]
 patterns:
   - regex: 'curl\s+[^|]*\|\s*(ba)?sh'
-    description: "curl output piped to bash"
+    description: "curl 결과를 bash로 바로 넘김"
   - regex: 'wget\s+[^|]*\|\s*(ba)?sh'
-    description: "wget output piped to bash"
-remediation: "Download the script, inspect it, verify checksum, then run"
+    description: "wget 결과를 bash로 바로 넘김"
+remediation: "스크립트를 먼저 내려받아 내용을 검토하고 체크섬을 확인한 뒤 실행하세요"
 tags: [supply-chain, rce]
 ```
 
 ### 2.3 Scoring (`src/scoring/`)
 
-**Responsibility:** Compute risk scores from findings.
+**역할:** finding을 바탕으로 위험 점수를 계산합니다.
 
-**Modules:**
+**모듈**
 
-- `score-calculator.ts` — Compute subscores and total
-- `weights.ts` — Severity/confidence weights and category weights
-- `thresholds.ts` — Score range interpretation
+- `score-calculator.ts`: 서브스코어와 총점 계산
+- `weights.ts`: severity/confidence/category 가중치 정의
 
-**Algorithm:**
+**알고리즘 요약**
 
 ```typescript
-// Severity to base points
 const SEVERITY_POINTS = {
   critical: 30,
   high: 15,
@@ -141,92 +140,71 @@ const SEVERITY_POINTS = {
   info: 1,
 };
 
-// Confidence multiplier
 const CONFIDENCE_WEIGHT = {
   high: 1.0,
   medium: 0.7,
   low: 0.4,
 };
 
-// Category weights for total score
 const CATEGORY_WEIGHTS = {
   shell: 0.3,
   network: 0.25,
   filesystem: 0.2,
   credentials: 0.25,
 };
-
-// Per-finding contribution
-function findingScore(finding: Finding): number {
-  return (
-    SEVERITY_POINTS[finding.severity] * CONFIDENCE_WEIGHT[finding.confidence]
-  );
-}
-
-// Category subscore
-function categorySubscore(findings: Finding[], category: string): number {
-  const raw = findings
-    .filter((f) => categoryMap(f.category) === category)
-    .reduce((sum, f) => sum + findingScore(f), 0);
-  return Math.min(raw, 100);
-}
-
-// Total score with critical floor
-function totalScore(subscores: Subscores, hasCritical: boolean): number {
-  const weighted = Object.entries(CATEGORY_WEIGHTS).reduce(
-    (sum, [cat, w]) => sum + subscores[cat] * w,
-    0,
-  );
-  const score = Math.min(Math.round(weighted), 100);
-  return hasCritical ? Math.max(score, 60) : score;
-}
 ```
 
-**Category Mapping:**
-| Finding Category | Subscore Dimension |
-|-----------------|-------------------|
+- finding별 기여도는 `severity 점수 × confidence 가중치`
+- 카테고리별 점수는 합산 후 100으로 cap
+- 전체 점수는 가중 합산 후 반올림
+- critical finding이 하나라도 있으면 전체 점수는 최소 60
+
+**카테고리 매핑**
+
+| finding category | 점수 차원 |
+| --- | --- |
 | `shell`, `obfuscation` | `shell` |
 | `network`, `supply-chain` | `network` |
 | `filesystem`, `macos`, `windows` | `filesystem` |
 | `credentials` | `credentials` |
-| `gha` | Split: permissions → `credentials`, run steps → `shell` |
+| `gha` | 권한 관련은 `credentials`, 실행 단계 관련은 `shell` |
 
 ### 2.4 Policy (`src/policy/`)
 
-**Responsibility:** Infer least-privilege policies from scan findings.
+**역할:** finding을 바탕으로 최소 권한 정책을 추론합니다.
 
-**Modules:**
+**모듈**
 
-- `policy-inferrer.ts` — Analyze findings to determine needed permissions
-- `policy-serializer.ts` — Write YAML policy file
-- `policy-validator.ts` — Validate policy against schema
-- `policy-merge.ts` — Merge generated policy with existing user policy (deny-first)
+- `policy-inferrer.ts`: 필요한 권한을 추론
+- `policy-serializer.ts`: YAML 정책 파일 직렬화
+- `policy-validator.ts`: 스키마 검증
+- `policy-merge.ts`: 기존 사용자 정책과 deny-first 방식으로 병합
 
-**Inference Logic:**
+**추론 로직**
 
-1. Collect all commands found in shell scripts → add safe ones to allowlist
-2. Collect all file paths accessed → add project-scoped paths to read allowlist
-3. Collect all outbound domains → add known-safe to domain allowlist
-4. For anything risky (found in findings), add to approval-required list
-5. Default: deny everything not explicitly allowed
+1. 셸 스크립트에서 발견된 명령을 수집해 안전한 명령은 allowlist에 추가
+2. 접근된 파일 경로를 분석해 프로젝트 내부 읽기 경로를 허용
+3. 외부 도메인을 수집해 알려진 안전 도메인을 허용
+4. 위험한 동작은 승인 필요 또는 deny 대상으로 분류
+5. 명시적으로 허용되지 않은 것은 기본적으로 차단
 
 ### 2.5 Report (`src/report/`)
 
-**Responsibility:** Format scan results for various outputs.
+**역할:** 스캔 결과를 다양한 형식으로 출력합니다.
 
-**Modules:**
+**모듈**
 
-- `json-reporter.ts` — Full JSON report (conforms to `schemas/report.schema.json`)
-- `markdown-reporter.ts` — Human-readable Markdown summary
-- `pr-comment-renderer.ts` — GitHub PR comment with badges, tables, evidence links
-- `sarif-reporter.ts` — SARIF format for GitHub Code Scanning (post-MVP)
+- `json-reporter.ts`: `schemas/report.schema.json`에 맞는 전체 JSON 리포트
+- `markdown-reporter.ts`: 사람이 읽기 쉬운 Markdown 보고서
+- `pr-comment-renderer.ts`: GitHub PR 댓글용 포맷
+- `sarif-reporter.ts`: GitHub Code Scanning용 SARIF
 
-**PR Comment Format:**
+**PR 댓글 예시**
 
 ```markdown
-## 🛡️ OpenGuard Scan Report
+## OpenGuard Scan Report
 
-**Risk Score: 72/100** (Very High) ⬆️ +15 vs base
+**Risk Score: 72/100** (Very High) +15 vs base
 
 | Category    | Score | Findings           |
 | ----------- | ----- | ------------------ |
@@ -235,52 +213,48 @@ function totalScore(subscores: Subscores, hasCritical: boolean): number {
 | Filesystem  | 45    | 2 medium           |
 | Credentials | 30    | 1 high             |
 
-### New Findings (this PR)
+### New Findings
 
-| ID         | Severity    | Rule         | File         | Line |
-| ---------- | ----------- | ------------ | ------------ | ---- |
-| `a1b2c3d4` | 🔴 Critical | OG-SHELL-001 | `install.sh` | L12  |
-| `e5f6g7h8` | 🟠 High     | OG-NET-001   | `setup.sh`   | L45  |
-
-<details><summary>📋 Recommended Policy Changes</summary>
-... YAML diff ...
-</details>
+| ID         | Severity | Rule         | File         | Line |
+| ---------- | -------- | ------------ | ------------ | ---- |
+| `a1b2c3d4` | Critical | OG-SHELL-001 | `install.sh` | L12  |
+| `e5f6g7h8` | High     | OG-NET-001   | `setup.sh`   | L45  |
 ```
 
 ### 2.6 CLI (`src/cli/`)
 
-**Responsibility:** Command-line interface and orchestration.
+**역할:** 명령행 인터페이스와 전체 오케스트레이션을 담당합니다.
 
-**Modules:**
+**모듈**
 
-- `index.ts` — Entry point, command parser (using `commander` or `yargs`)
-- `scan-command.ts` — Orchestrate: ingest → scan → score → report
-- `policy-command.ts` — Orchestrate: ingest → scan → policy generate
-- `sign-command.ts` — Sign artifact
-- `verify-command.ts` — Verify artifact
+- `index.ts`: 명령 등록과 엔트리포인트
+- `scan-command.ts`: ingest → scan → score → report 흐름 실행
+- `policy-command.ts`: ingest → scan → policy generate 흐름 실행
+- `sign-command.ts`: 산출물 서명
+- `verify-command.ts`: 산출물 검증
 
 ### 2.7 Server (`src/server/`)
 
-**Responsibility:** Serve a local, read-only dashboard for scan history and policy status.
+**역할:** 스캔 이력과 정책 상태를 보여주는 읽기 전용 로컬 대시보드를 제공합니다.
 
-**Modules (planned):**
+**모듈**
 
-- `index.ts` — HTTP server entry point
-- `api.ts` — Minimal JSON API for runs, summary, policies
-- `store.ts` — File-based run store and index management
-- `ui/` — Static HTML/JS/CSS assets
+- `index.ts`: HTTP 서버 엔트리포인트
+- `api.ts`: runs, summary, policy를 제공하는 최소 JSON API
+- `store.ts`: 파일 기반 실행 이력 저장소와 인덱스 관리
+- `ui/`: 정적 HTML/JS/CSS 자산
 
 ### 2.8 Trust (`src/trust/`)
 
-**Responsibility:** SLSA-lite signing and verification.
+**역할:** SLSA-lite 수준의 서명과 검증을 제공합니다.
 
-**Modules:**
+**모듈**
 
-- `signer.ts` — Sign artifact hash + metadata with Ed25519 key
-- `verifier.ts` — Verify signature against public key
-- `metadata.ts` — Generate provenance metadata (timestamp, commit, version)
+- `signer.ts`: Ed25519 키로 산출물 해시와 메타데이터에 서명
+- `verifier.ts`: 공개키 기준으로 서명 검증
+- `metadata.ts`: 타임스탬프, 커밋, 버전 같은 provenance 메타데이터 생성
 
-**Signature Envelope:**
+**서명 엔벌로프 예시**
 
 ```json
 {
@@ -296,159 +270,159 @@ function totalScore(subscores: Subscores, hasCritical: boolean): number {
 }
 ```
 
-## 3. Data Flow Diagrams
+## 3. 데이터 흐름
 
-### 3.1 Scan Flow
+### 3.1 스캔 흐름
 
 ```
-User: openguard scan ./skill
+사용자: openguard scan ./skill
           │
           ▼
     ┌─────────────┐
-    │  Ingest      │
-    │  repo-loader │──► Resolve path / clone repo
-    │  file-disc.  │──► Walk & discover files
-    │  file-class. │──► Classify by type
-    └──────┬───────┘
+    │  Ingest     │
+    │  repo-loader│──► 경로 해석 / 저장소 clone
+    │  file-disc. │──► 파일 탐색
+    │  file-class.│──► 파일 유형 분류
+    └──────┬──────┘
            │ FileEntry[]
            ▼
     ┌─────────────┐
-    │  Scanner     │
-    │  rule-loader │──► Load rules/*.yaml
-    │  rule-engine │──► Match patterns per file
-    │  evidence    │──► Extract context
-    └──────┬───────┘
+    │  Scanner    │
+    │  rule-loader│──► rules/*.yaml 로드
+    │  rule-engine│──► 파일별 패턴 매칭
+    │  evidence   │──► 근거 추출
+    └──────┬──────┘
            │ Finding[]
            ▼
     ┌─────────────┐
-    │  Scoring     │──► Compute subscores + total
-    └──────┬───────┘
-           │ ScoredReport
-           ▼
-    ┌─────────────┐
-    │  Policy      │──► Infer allowlist (optional)
-    └──────┬───────┘
-           │ Policy
-           ▼
-    ┌─────────────┐
-    │  Report      │──► Format output (JSON/MD/PR)
-    └──────┬───────┘
+    │  Scoring    │──► 서브스코어 + 총점 계산
+    └──────┬──────┘
            │
            ▼
-     stdout / file
+    ┌─────────────┐
+    │  Policy     │──► allowlist 정책 생성(선택)
+    └──────┬──────┘
+           │
+           ▼
+    ┌─────────────┐
+    │  Report     │──► JSON / MD / SARIF 출력
+    └──────┬──────┘
+           │
+           ▼
+      stdout / file
 ```
 
-### 3.2 CI Flow (GitHub Action)
+### 3.2 CI 흐름 (GitHub Action)
 
 ```
-PR opened/updated
+PR 생성/업데이트
        │
        ▼
-GitHub Action triggered
+GitHub Action 실행
        │
        ▼
-Checkout HEAD + BASE
+HEAD + BASE checkout
        │
        ▼
- Build action bundle (dist/index.js)
+Action 번들 준비
        │
        ▼
-Run scan on HEAD ──────────────────┐
-Run scan on BASE ──────┐           │
-                       │           │
-                       ▼           ▼
-                 base_report   head_report
-                       │           │
-                       └─────┬─────┘
-                             │
-                        Diff findings
-                             │
-                             ▼
-                     New findings only
-                             │
-                             ▼
-                    Render PR comment
-                             │
-                             ▼
-                  Post/update comment via API
-                             │
-                             ▼
-                  Set check status (pass/fail)
+HEAD 스캔 ─────────────────────┐
+BASE 스캔 ─────────┐           │
+                   │           │
+                   ▼           ▼
+              base_report  head_report
+                   │           │
+                   └─────┬─────┘
+                         │
+                    finding diff
+                         │
+                         ▼
+                  신규 finding만 추출
+                         │
+                         ▼
+                    PR 댓글 렌더링
+                         │
+                         ▼
+                  댓글 게시/업데이트
+                         │
+                         ▼
+                    체크 상태 설정
 ```
 
-## 4. Technology Choices
+## 4. 기술 선택
 
-| Concern         | Choice                | Rationale                                                   |
-| --------------- | --------------------- | ----------------------------------------------------------- |
-| Language        | TypeScript (strict)   | Ecosystem alignment (npm, GitHub Actions), team familiarity |
-| Runtime         | Node.js 20+           | LTS, stable, good perf for I/O-bound work                   |
-| Package manager | pnpm                  | Fast, strict, good monorepo support                         |
-| CLI framework   | `commander`           | Lightweight, widely used                                    |
-| YAML parsing    | `js-yaml`             | Standard, well-maintained                                   |
-| Git operations  | `simple-git`          | Programmatic git access                                     |
-| Hashing         | Node.js `crypto`      | Built-in, no external deps                                  |
-| Signing         | `@noble/ed25519`      | Pure JS, audited, no native deps                            |
-| Testing         | `vitest`              | Fast, TypeScript-native, good DX                            |
-| Linting         | `eslint` + `prettier` | Standard                                                    |
-| Build           | `tsup`                | Fast bundler for CLIs                                       |
+| 관심사 | 선택 | 이유 |
+| --- | --- | --- |
+| 언어 | TypeScript (strict) | npm/GitHub Actions 생태계와 잘 맞고 팀 친화적 |
+| 런타임 | Node.js 20+ | LTS, 안정성, I/O 중심 작업에 적합 |
+| 패키지 매니저 | pnpm | 빠르고 엄격하며 관리가 편함 |
+| CLI 프레임워크 | `commander` | 가볍고 널리 쓰임 |
+| YAML 파싱 | `js-yaml` | 표준적이고 유지보수가 안정적 |
+| Git 연산 | `simple-git` | 프로그래밍 방식 Git 제어 |
+| 해싱 | Node.js `crypto` | 내장 모듈, 추가 의존성 최소화 |
+| 서명 | `@noble/ed25519` | 순수 JS, 감사 이력, 네이티브 의존성 없음 |
+| 테스트 | `vitest` | 빠르고 TypeScript 친화적 |
+| 린트/포맷 | `eslint` + `prettier` | 표준적 조합 |
+| 빌드 | `tsup` | CLI 번들링에 적합 |
 
-## 5. Rule System Design
+## 5. 규칙 시스템 설계
 
-### 5.1 Rule Definition Format
+### 5.1 규칙 정의 형식
 
-Rules are data-driven YAML files in `rules/` directory, organized by category:
+규칙은 `rules/` 디렉터리에 있는 YAML 데이터 파일입니다.
 
 ```
 rules/
-├── shell.yaml        # Shell/installer patterns
-├── powershell.yaml   # PowerShell patterns
-├── network.yaml      # Network/exfiltration patterns
-├── credentials.yaml  # Credential access patterns
-├── gha.yaml          # GitHub Actions patterns
-├── macos.yaml        # macOS-specific patterns
-├── supply-chain.yaml # Supply chain patterns
-└── _meta.yaml        # Shared severity/confidence definitions
+├── shell.yaml
+├── powershell.yaml
+├── network.yaml
+├── credentials.yaml
+├── gha.yaml
+├── macos.yaml
+├── supply-chain.yaml
+└── _meta.yaml
 ```
 
-### 5.2 Rule Loading & Caching
+### 5.2 규칙 로딩 및 캐싱
 
-- Rules are loaded once at startup and cached in memory
-- Rule files are validated against the rule schema
-- Custom rules can be added via `--rules` CLI flag (merged with built-in)
-- Rule conflicts resolved by: custom > built-in
+- 규칙은 시작 시 한 번 로드하고 메모리에 유지
+- 규칙 파일은 스키마에 맞게 검증
+- `--rules` 플래그로 사용자 정의 규칙을 병합 가능
+- 충돌 시 우선순위는 `custom > built-in`
 
-### 5.3 Pattern Matching
+### 5.3 패턴 매칭
 
-MVP uses **regex-based matching** with:
+MVP에서는 정규식 기반 매칭을 사용합니다.
 
-- Per-line matching for most rules
-- Multi-line matching for specific patterns (e.g., heredoc detection)
-- Context extraction: ±3 lines around match for evidence snippet
-- Match groups captured for evidence detail
+- 대부분의 규칙은 라인 기반 매칭
+- 일부 규칙은 멀티라인 매칭 지원
+- 증거 스니펫은 매치 기준 앞뒤 3줄 문맥 추출
+- 매칭 텍스트와 그룹은 evidence 상세에 반영
 
-Post-MVP extensions:
+향후 확장 방향:
 
-- AST-based analysis for JavaScript/TypeScript/Python
-- YAML structure-aware matching for GitHub Actions
-- OPA/Rego policy evaluation
+- JavaScript/TypeScript/Python AST 기반 분석
+- GitHub Actions용 YAML 구조 인지 매칭 강화
+- OPA/Rego 기반 정책 평가
 
-## 6. Extension Points (Post-MVP)
+## 6. 확장 포인트 (Post-MVP)
 
-| Extension          | Description                                    |
-| ------------------ | ---------------------------------------------- |
-| Custom rule packs  | Community-contributed rule sets (npm packages) |
-| Language analyzers | AST-based analysis beyond regex                |
-| Policy evaluator   | OPA/Rego runtime for complex policies          |
-| Sandbox executor   | Container-based dynamic analysis               |
-| Web dashboard      | Team policy management, audit logs, team admin |
-| API server         | REST/GraphQL for platform integrations         |
-| Plugin system      | Custom reporters, ingestors, scorers           |
+| 확장 항목 | 설명 |
+| --- | --- |
+| 사용자 정의 규칙 팩 | 커뮤니티 규칙 세트(npm 패키지 형태) |
+| 언어 분석기 | 정규식 이상의 AST 기반 분석 |
+| 정책 평가기 | 복잡한 정책을 위한 OPA/Rego 런타임 |
+| 샌드박스 실행기 | 컨테이너 기반 동적 분석 |
+| 웹 대시보드 | 팀 정책 관리, 감사 로그, 팀 관리 |
+| API 서버 | 플랫폼 연동용 REST/GraphQL |
+| 플러그인 시스템 | 커스텀 리포터, ingest, scorer 확장 |
 
-## 7. Security Considerations
+## 7. 보안 고려사항
 
-- **No code execution** — Scanner is purely static; never executes scanned code
-- **No network calls** — Scanning is offline (except initial repo clone)
-- **No telemetry** — No data leaves the user's machine (MVP)
-- **Deterministic output** — Same input always produces same finding IDs
-- **Secret masking** — Logging masks patterns that look like API keys/tokens
-- **Minimal dependencies** — Reduce supply chain surface of the tool itself
+- **코드 실행 금지**: 스캐너는 정적 분석만 수행하며, 대상 코드를 실행하지 않음
+- **스캔 중 네트워크 호출 금지**: 최초 저장소 fetch 이후에는 오프라인 동작
+- **텔레메트리 없음**: MVP 기준으로 사용자 데이터는 외부로 전송되지 않음
+- **결정적 출력**: 같은 입력은 항상 같은 finding ID를 생성
+- **시크릿 마스킹**: 로그에 API 키/토큰처럼 보이는 문자열이 남지 않도록 처리
+- **의존성 최소화**: 도구 자체의 공급망 공격 표면을 줄이기 위해 의존성 수를 제한
